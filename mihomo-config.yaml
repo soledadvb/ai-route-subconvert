@@ -1,0 +1,193 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+unified-delay: true
+tcp-concurrent: true
+
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+
+proxy-providers:
+  AirportSub:
+    type: http
+    url: "https://example.com/sub"
+    path: ./proxies/airport.yaml
+    interval: 3600
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: 🚀 节点选择
+    type: select
+    use:
+      - AirportSub
+  - name: 🤖 OpenAI
+    type: select
+    use:
+      - AirportSub
+    filter: "^(?!.*(港|HK|Hong|中国|CN|官网|到期|流量)).*$"
+  - name: 🟠 Claude
+    type: select
+    use:
+      - AirportSub
+    filter: "^(?!.*(港|HK|Hong|中国|CN|官网|到期|流量)).*$"
+  - name: 🔵 Gemini
+    type: select
+    use:
+      - AirportSub
+    filter: "^(?!.*(港|HK|Hong|中国|CN|官网|到期|流量)).*$"
+  - name: ⚡ Grok & Perplexity
+    type: select
+    use:
+      - AirportSub
+    filter: "^(?!.*(港|HK|Hong|中国|CN|官网|到期|流量)).*$"
+  - name: ✨ Other AI
+    type: select
+    use:
+      - AirportSub
+    filter: "^(?!.*(港|HK|Hong|中国|CN|官网|到期|流量)).*$"
+  - name: 📺 YouTube
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: 🎬 流媒体
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: 🎵 Spotify
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: ✈️ Telegram
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: 🐦 社交媒体
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: 🔍 Google
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: 💻 DevTools
+    type: select
+    proxies:
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: ☁️ Microsoft
+    type: select
+    proxies:
+      - DIRECT
+      - 🚀 节点选择
+    use:
+      - AirportSub
+  - name: 🐟 漏网之鱼
+    type: select
+    proxies:
+      - 🚀 节点选择
+      - DIRECT
+
+rule-providers:
+  private: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/private.mrs", path: ./ruleset/private.mrs, interval: 86400, format: mrs}
+  private-ip: {type: http, behavior: ipcidr, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/private.mrs", path: ./ruleset/private-ip.mrs, interval: 86400, format: mrs}
+  category-ads-all: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/category-ads-all.mrs", path: ./ruleset/category-ads-all.mrs, interval: 86400, format: mrs}
+  category-ai-cn: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/category-ai-cn.mrs", path: ./ruleset/category-ai-cn.mrs, interval: 86400, format: mrs}
+  openai: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/openai.mrs", path: ./ruleset/openai.mrs, interval: 86400, format: mrs}
+  anthropic: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/anthropic.mrs", path: ./ruleset/anthropic.mrs, interval: 86400, format: mrs}
+  google-gemini: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/google-gemini.mrs", path: ./ruleset/google-gemini.mrs, interval: 86400, format: mrs}
+  xai: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/xai.mrs", path: ./ruleset/xai.mrs, interval: 86400, format: mrs}
+  perplexity: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/perplexity.mrs", path: ./ruleset/perplexity.mrs, interval: 86400, format: mrs}
+  "category-ai-chat-!cn": {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/category-ai-chat-!cn.mrs", path: "./ruleset/category-ai-chat-!cn.mrs", interval: 86400, format: mrs}
+  youtube: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/youtube.mrs", path: ./ruleset/youtube.mrs, interval: 86400, format: mrs}
+  netflix: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/netflix.mrs", path: ./ruleset/netflix.mrs, interval: 86400, format: mrs}
+  spotify: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/spotify.mrs", path: ./ruleset/spotify.mrs, interval: 86400, format: mrs}
+  bilibili: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/bilibili.mrs", path: ./ruleset/bilibili.mrs, interval: 86400, format: mrs}
+  telegram: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/telegram.mrs", path: ./ruleset/telegram.mrs, interval: 86400, format: mrs}
+  telegram-ip: {type: http, behavior: ipcidr, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/telegram.mrs", path: ./ruleset/telegram-ip.mrs, interval: 86400, format: mrs}
+  twitter: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/twitter.mrs", path: ./ruleset/twitter.mrs, interval: 86400, format: mrs}
+  google: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/google.mrs", path: ./ruleset/google.mrs, interval: 86400, format: mrs}
+  google-ip: {type: http, behavior: ipcidr, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/google.mrs", path: ./ruleset/google-ip.mrs, interval: 86400, format: mrs}
+  github: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/github.mrs", path: ./ruleset/github.mrs, interval: 86400, format: mrs}
+  gitlab: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/gitlab.mrs", path: ./ruleset/gitlab.mrs, interval: 86400, format: mrs}
+  atlassian: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/atlassian.mrs", path: ./ruleset/atlassian.mrs, interval: 86400, format: mrs}
+  onedrive: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/onedrive.mrs", path: ./ruleset/onedrive.mrs, interval: 86400, format: mrs}
+  microsoft: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/microsoft.mrs", path: ./ruleset/microsoft.mrs, interval: 86400, format: mrs}
+  icloud: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/icloud.mrs", path: ./ruleset/icloud.mrs, interval: 86400, format: mrs}
+  apple: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/apple.mrs", path: ./ruleset/apple.mrs, interval: 86400, format: mrs}
+  geolocation-cn: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/geolocation-cn.mrs", path: ./ruleset/geolocation-cn.mrs, interval: 86400, format: mrs}
+  cn: {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/cn.mrs", path: ./ruleset/cn.mrs, interval: 86400, format: mrs}
+  cn-ip: {type: http, behavior: ipcidr, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geoip/cn.mrs", path: ./ruleset/cn-ip.mrs, interval: 86400, format: mrs}
+  "geolocation-!cn": {type: http, behavior: domain, url: "https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/geo/geosite/geolocation-!cn.mrs", path: "./ruleset/geolocation-!cn.mrs", interval: 86400, format: mrs}
+
+rules:
+  # 1. 局域网与广告拦截
+  - RULE-SET,private,DIRECT
+  - RULE-SET,category-ads-all,REJECT
+
+  # 2. 国内 AI 显式直连
+  - RULE-SET,category-ai-cn,DIRECT
+
+  # 3. 精细化海外 AI（优先于日常服务与兜底）
+  - RULE-SET,openai,🤖 OpenAI
+  - RULE-SET,anthropic,🟠 Claude
+  - RULE-SET,google-gemini,🔵 Gemini
+  - RULE-SET,xai,⚡ Grok & Perplexity
+  - RULE-SET,perplexity,⚡ Grok & Perplexity
+  - RULE-SET,category-ai-chat-!cn,✨ Other AI
+
+  # 4. 日常流媒体、社交、办公开发与游戏
+  - RULE-SET,youtube,📺 YouTube
+  - RULE-SET,netflix,🎬 流媒体
+  - RULE-SET,spotify,🎵 Spotify
+  - RULE-SET,bilibili,DIRECT
+  - RULE-SET,telegram,✈️ Telegram
+  - RULE-SET,twitter,🐦 社交媒体
+  - RULE-SET,google,🔍 Google
+  - RULE-SET,github,💻 DevTools
+  - RULE-SET,gitlab,💻 DevTools
+  - RULE-SET,atlassian,💻 DevTools
+  - RULE-SET,onedrive,☁️ Microsoft
+  - RULE-SET,microsoft,☁️ Microsoft
+  - RULE-SET,icloud,DIRECT
+  - RULE-SET,apple,DIRECT
+
+  # 5. 国内与海外域名分流
+  - RULE-SET,geolocation-cn,DIRECT
+  - RULE-SET,cn,DIRECT
+  - RULE-SET,geolocation-!cn,🚀 节点选择
+
+  # 6. IP 规则置底 (统一附带 no-resolve)
+  - RULE-SET,private-ip,DIRECT,no-resolve
+  - RULE-SET,telegram-ip,✈️ Telegram,no-resolve
+  - RULE-SET,google-ip,🔍 Google,no-resolve
+  - RULE-SET,cn-ip,DIRECT,no-resolve
+
+  # 7. 最终兜底
+  - MATCH,🐟 漏网之鱼
