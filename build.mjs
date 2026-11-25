@@ -12,6 +12,6 @@ if (!match || new URL(match[2]).origin !== 'https://example.com') {
 const template = config.replace(provider, '$1__NODE_SUB_URL__');
 await mkdir(new URL('./public/', import.meta.url), { recursive: true });
 await writeFile(new URL('./public/template.txt', import.meta.url), template, 'utf8');
-for (const [source, target] of [['worker.mjs', '_worker.js'], ['index.html', 'index.html'], ['nodes.yaml', 'nodes.yaml']]) {
+for (const [source, target] of [['worker.mjs', '_worker.js'], ['ai-route-subconvert.html', 'index.html'], ['nodes.yaml', 'nodes.yaml']]) {
   await copyFile(new URL('./' + source, import.meta.url), new URL('./public/' + target, import.meta.url));
 }

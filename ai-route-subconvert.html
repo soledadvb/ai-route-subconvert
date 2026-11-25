@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Route Subconvert</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #09090b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans antialiased min-h-screen flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+
+  <!-- Header -->
+  <header class="border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-semibold tracking-tight text-white">AI Route Subconvert</h1>
+          <p class="text-xs text-zinc-400">AI 服务分类分流与订阅配置生成</p>
+        </div>
+      </div>
+
+      <!-- Output Mode Tabs -->
+      <div class="flex items-center p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
+        <button
+          id="tab-yaml"
+          type="button"
+          onclick="setMode('yaml')"
+          class="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          完整 Mihomo YAML
+        </button>
+        <button
+          id="tab-js"
+          type="button"
+          onclick="setMode('js')"
+          class="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+        >
+          Clash Verge Rev 覆写脚本
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Two-Column Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- Left Column: Configuration Panel -->
+    <section class="lg:col-span-5 space-y-5">
+
+      <!-- 1. Subscription & Node Filter -->
+      <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-white">订阅与节点过滤</h2>
+
+        <div id="sub-url-group" class="space-y-1.5">
+          <label for="sub-url" class="block text-xs font-medium text-zinc-300">
+            节点订阅链接 <span class="text-zinc-500 font-normal">(用于 YAML proxy-providers)</span>
+          </label>
+          <input
+            id="sub-url"
+            type="url"
+            value="https://example.com/sub"
+            placeholder="https://your-airport.com/subscribe?token=..."
+            class="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+          />
+        </div>
+
+        <label class="flex items-start gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer hover:border-zinc-700 transition-colors">
+          <input
+            id="exclude-hk"
+            type="checkbox"
+            checked
+            class="mt-0.5 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/40 focus:ring-offset-0"
+          />
+          <div class="min-w-0">
+            <div class="text-xs sm:text-sm font-medium text-zinc-200">AI 策略组自动排除香港/国内/无效节点</div>
+            <div class="text-[11px] font-mono text-zinc-500 mt-0.5 break-all">正则：港|HK|Hong|中国|CN|官网|到期|流量</div>
+          </div>
+        </label>
+      </div>
+
+      <!-- 2. GitHub Rule Sync Source -->
+      <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-4">
+        <h2 class="text-sm font-semibold text-white">GitHub 规则同步源</h2>
+
+        <div class="space-y-1.5">
+          <label for="cdn-select" class="block text-xs font-medium text-zinc-300">镜像前缀</label>
+          <select
+            id="cdn-select"
+            class="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+          >
+            <option value="github">GitHub 原生 (github.com/MetaCubeX/meta-rules-dat)</option>
+            <option value="jsdelivr">jsDelivr (Fastly) (fastly.jsdelivr.net/gh/...)</option>
+            <option value="custom">自定义反代前缀</option>
+          </select>
+        </div>
+
+        <div id="custom-prefix-box" class="hidden space-y-1.5">
+          <label for="custom-prefix" class="block text-xs font-medium text-zinc-300">自定义前缀 URL</label>
+          <input
+            id="custom-prefix"
+            type="url"
+            placeholder="https://your-mirror.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/"
+            class="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="sync-interval" class="block text-xs font-medium text-zinc-300">
+            自动同步周期 <span class="text-zinc-500 font-normal">(interval，单位：秒)</span>
+          </label>
+          <input
+            id="sync-interval"
+            type="number"
+            min="300"
+            step="300"
+            value="86400"
+            class="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500"
+          />
+        </div>
+      </div>
+
+      <!-- 3. Fine-grained AI Rules -->
+      <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">精细化 AI 分流规则</h2>
+          <span class="text-[11px] font-mono text-zinc-500">按优先级自动排序</span>
+        </div>
+
+        <div id="ai-rules-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- 4. Common Services & Base Rules -->
+      <div id="common-services-card" class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">常用服务与基础规则</h2>
+          <span class="text-[11px] text-zinc-500">YAML 模式生效</span>
+        </div>
+
+        <div id="common-services-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Rendered by JS -->
+        </div>
+
+        <p class="text-[11px] text-zinc-500 pt-1">
+          基础规则（<code class="font-mono text-zinc-400">private</code>、<code class="font-mono text-zinc-400">private-ip</code>、<code class="font-mono text-zinc-400">geolocation-cn</code>、<code class="font-mono text-zinc-400">cn</code>、<code class="font-mono text-zinc-400">cn-ip</code>、<code class="font-mono text-zinc-400">geolocation-!cn</code>）已自动内置。
+        </p>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Live Code Preview -->
+    <section class="lg:col-span-7 lg:sticky lg:top-20 flex flex-col bg-zinc-900/80 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl shadow-black/30 lg:max-h-[calc(100vh-6.5rem)]">
+      <!-- Preview Toolbar -->
+      <div class="px-4 py-3 border-b border-zinc-800 bg-zinc-900 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span id="preview-filename" class="text-xs font-mono font-medium text-zinc-200">ai-route-subconvert.yaml</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            id="btn-copy"
+            type="button"
+            onclick="copyCode()"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span id="copy-label">复制</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="downloadCode()"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>下载文件</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Code Area -->
+      <div class="flex-1 overflow-auto bg-[#0b0b0e] p-4 min-h-[460px]">
+        <pre class="text-xs leading-relaxed font-mono text-zinc-300 whitespace-pre"><code id="code-output"></code></pre>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // Configuration Definitions
+    // =========================================================================
+    const MIRRORS = {
+      github: 'https://github.com/MetaCubeX/meta-rules-dat/raw/refs/heads/meta/',
+      jsdelivr: 'https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/',
+    };
+
+    const EXCLUDE_REGEX = '港|HK|Hong|中国|CN|官网|到期|流量';
+
+    const AI_ITEMS = [
+      { id: 'category-ai-cn', label: '国内 AI 直连', target: 'DIRECT' },
+      { id: 'openai', label: 'OpenAI / ChatGPT', target: '🤖 OpenAI' },
+      { id: 'anthropic', label: 'Claude', target: '🟠 Claude' },
+      { id: 'google-gemini', label: 'Gemini', target: '🔵 Gemini' },
+      { id: 'xai', label: 'xAI / Grok', target: '⚡ Grok & Perplexity' },
+      { id: 'perplexity', label: 'Perplexity', target: '⚡ Grok & Perplexity' },
+      { id: 'category-ai-chat-!cn', label: '海外 AI 兜底', target: '✨ Other AI' },
+    ];
+
+    const SERVICE_ITEMS = [
+      { id: 'ads', label: '广告拦截 (category-ads-all)' },
+      { id: 'youtube', label: 'YouTube (youtube)' },
+      { id: 'google', label: 'Google (+ google-ip)' },
+      { id: 'devtools', label: 'DevTools (github/gitlab/atlassian)' },
+      { id: 'microsoft', label: 'Microsoft (microsoft/onedrive)' },
+      { id: 'apple', label: 'Apple (apple/icloud)' },
+      { id: 'telegram', label: 'Telegram (+ telegram-ip)' },
+    ];
+
+    const PROVIDER_DEFS = {
+      'category-ads-all': { behavior: 'domain', path: 'geo/geosite/category-ads-all.mrs' },
+      'private': { behavior: 'domain', path: 'geo/geosite/private.mrs' },
+      'private-ip': { behavior: 'ipcidr', path: 'geo/geoip/private.mrs' },
+      'category-ai-cn': { behavior: 'domain', path: 'geo/geosite/category-ai-cn.mrs' },
+      'openai': { behavior: 'domain', path: 'geo/geosite/openai.mrs' },
+      'anthropic': { behavior: 'domain', path: 'geo/geosite/anthropic.mrs' },
+      'google-gemini': { behavior: 'domain', path: 'geo/geosite/google-gemini.mrs' },
+      'xai': { behavior: 'domain', path: 'geo/geosite/xai.mrs' },
+      'perplexity': { behavior: 'domain', path: 'geo/geosite/perplexity.mrs' },
+      'category-ai-chat-!cn': { behavior: 'domain', path: 'geo/geosite/category-ai-chat-!cn.mrs' },
+      'youtube': { behavior: 'domain', path: 'geo/geosite/youtube.mrs' },
+      'google': { behavior: 'domain', path: 'geo/geosite/google.mrs' },
+      'google-ip': { behavior: 'ipcidr', path: 'geo/geoip/google.mrs' },
+      'github': { behavior: 'domain', path: 'geo/geosite/github.mrs' },
+      'gitlab': { behavior: 'domain', path: 'geo/geosite/gitlab.mrs' },
+      'atlassian': { behavior: 'domain', path: 'geo/geosite/atlassian.mrs' },
+      'microsoft': { behavior: 'domain', path: 'geo/geosite/microsoft.mrs' },
+      'onedrive': { behavior: 'domain', path: 'geo/geosite/onedrive.mrs' },
+      'apple': { behavior: 'domain', path: 'geo/geosite/apple.mrs' },
+      'icloud': { behavior: 'domain', path: 'geo/geosite/icloud.mrs' },
+      'telegram': { behavior: 'domain', path: 'geo/geosite/telegram.mrs' },
+      'telegram-ip': { behavior: 'ipcidr', path: 'geo/geoip/telegram.mrs' },
+      'geolocation-cn': { behavior: 'domain', path: 'geo/geosite/geolocation-cn.mrs' },
+      'cn': { behavior: 'domain', path: 'geo/geosite/cn.mrs' },
+      'cn-ip': { behavior: 'ipcidr', path: 'geo/geoip/cn.mrs' },
+      'geolocation-!cn': { behavior: 'domain', path: 'geo/geosite/geolocation-!cn.mrs' },
+    };
+
+    // =========================================================================
+    // Application State
+    // =========================================================================
+    const state = {
+      mode: 'yaml', // 'yaml' | 'js'
+      subUrl: 'https://example.com/sub',
+      excludeHk: true,
+      cdn: 'github',
+      customPrefix: '',
+      interval: 86400,
+      ai: {
+        'category-ai-cn': true,
+        'openai': true,
+        'anthropic': true,
+        'google-gemini': true,
+        'xai': true,
+        'perplexity': true,
+        'category-ai-chat-!cn': true,
+      },
+      services: {
+        ads: true,
+        youtube: true,
+        google: true,
+        devtools: true,
+        microsoft: true,
+        apple: true,
+        telegram: true,
+      },
+    };
+
+    let currentOutput = '';
+
+    // =========================================================================
+    // UI Rendering
+    // =========================================================================
+    function renderCheckboxes() {
+      const aiContainer = document.getElementById('ai-rules-list');
+      aiContainer.innerHTML = AI_ITEMS.map(item => `
+        <label class="flex items-start gap-2.5 p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer hover:border-zinc-700 transition-colors">
+          <input
+            type="checkbox"
+            data-ai="${item.id}"
+            ${state.ai[item.id] ? 'checked' : ''}
+            class="mt-0.5 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/40 focus:ring-offset-0 shrink-0"
+          />
+          <div class="min-w-0">
+            <div class="text-xs font-medium text-zinc-200 truncate">${item.label}</div>
+            <div class="text-[11px] font-mono text-zinc-500 truncate">${item.id} → ${item.target}</div>
+          </div>
+        </label>
+      `).join('');
+
+      aiContainer.querySelectorAll('input[data-ai]').forEach(el => {
+        el.addEventListener('change', e => {
+          state.ai[e.target.dataset.ai] = e.target.checked;
+          updatePreview();
+        });
+      });
+
+      const svcContainer = document.getElementById('common-services-list');
+      svcContainer.innerHTML = SERVICE_ITEMS.map(item => `
+        <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer hover:border-zinc-700 transition-colors">
+          <input
+            type="checkbox"
+            data-svc="${item.id}"
+            ${state.services[item.id] ? 'checked' : ''}
+            class="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500/40 focus:ring-offset-0 shrink-0"
+          />
+          <span class="text-xs text-zinc-200 truncate">${item.label}</span>
+        </label>
+      `).join('');
+
+      svcContainer.querySelectorAll('input[data-svc]').forEach(el => {
+        el.addEventListener('change', e => {
+          state.services[e.target.dataset.svc] = e.target.checked;
+          updatePreview();
+        });
+      });
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      const tabYaml = document.getElementById('tab-yaml');
+      const tabJs = document.getElementById('tab-js');
+      const filename = document.getElementById('preview-filename');
+      const subUrlGroup = document.getElementById('sub-url-group');
+      const commonCard = document.getElementById('common-services-card');
+
+      if (mode === 'yaml') {
+        tabYaml.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm';
+        tabJs.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-zinc-200';
+        filename.textContent = 'ai-route-subconvert.yaml';
+        subUrlGroup.classList.remove('opacity-50');
+        commonCard.classList.remove('opacity-50');
+      } else {
+        tabJs.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm';
+        tabYaml.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-zinc-200';
+        filename.textContent = 'ai-route-subconvert-override.js';
+        subUrlGroup.classList.add('opacity-50');
+        commonCard.classList.add('opacity-50');
+      }
+      updatePreview();
+    }
+
+    // =========================================================================
+    // Code Generation Helpers
+    // =========================================================================
+    function getPrefix() {
+      if (state.cdn === 'custom') {
+        const val = state.customPrefix.trim();
+        if (!val) return MIRRORS.github;
+        return val.endsWith('/') ? val : val + '/';
+      }
+      return MIRRORS[state.cdn] || MIRRORS.github;
+    }
+
+    function formatKey(key) {
+      return key.includes('!') ? `"${key}"` : key;
+    }
+
+    function formatPath(key) {
+      const p = `./ruleset/${key}.mrs`;
+      return key.includes('!') ? `"${p}"` : p;
+    }
+
+    function buildProviderYamlLine(key, prefix, interval) {
+      const def = PROVIDER_DEFS[key];
+      return `  ${formatKey(key)}: {type: http, behavior: ${def.behavior}, url: "${prefix}${def.path}", path: ${formatPath(key)}, interval: ${interval}, format: mrs}`;
+    }
+
+    function generateYaml() {
+      const prefix = getPrefix();
+      const interval = Math.max(300, Number(state.interval) || 86400);
+      const subUrl = (state.subUrl || 'https://example.com/sub').trim();
+      const filterLine = state.excludeHk ? `\n    filter: "^(?!.*(${EXCLUDE_REGEX})).*$"` : '';
+
+      // 1. Collect active rule-providers
+      const providers = [];
+      if (state.services.ads) providers.push('category-ads-all');
+      providers.push('private', 'private-ip');
+
+      // AI providers
+      ['category-ai-cn', 'openai', 'anthropic', 'google-gemini', 'xai', 'perplexity', 'category-ai-chat-!cn'].forEach(k => {
+        if (state.ai[k]) providers.push(k);
+      });
+
+      // Common services
+      if (state.services.youtube) providers.push('youtube');
+      if (state.services.google) providers.push('google', 'google-ip');
+      if (state.services.devtools) providers.push('github', 'gitlab', 'atlassian');
+      if (state.services.microsoft) providers.push('microsoft', 'onedrive');
+      if (state.services.apple) providers.push('apple', 'icloud');
+      if (state.services.telegram) providers.push('telegram', 'telegram-ip');
+
+      // Base CN / Non-CN
+      providers.push('geolocation-cn', 'cn', 'cn-ip', 'geolocation-!cn');
+
+      // 2. Proxy Groups
+      const groups = [];
+      groups.push(
+`  - name: 🚀 节点选择
+    type: select
+    use:
+      - AirportSub`
+      );
+
+      if (state.ai['openai']) {
+        groups.push(`  - name: 🤖 OpenAI\n    type: select\n    use:\n      - AirportSub${filterLine}`);
+      }
+      if (state.ai['anthropic']) {
+        groups.push(`  - name: 🟠 Claude\n    type: select\n    use:\n      - AirportSub${filterLine}`);
+      }
+      if (state.ai['google-gemini']) {
+        groups.push(`  - name: 🔵 Gemini\n    type: select\n    use:\n      - AirportSub${filterLine}`);
+      }
+      if (state.ai['xai'] || state.ai['perplexity']) {
+        groups.push(`  - name: ⚡ Grok & Perplexity\n    type: select\n    use:\n      - AirportSub${filterLine}`);
+      }
+      if (state.ai['category-ai-chat-!cn']) {
+        groups.push(`  - name: ✨ Other AI\n    type: select\n    use:\n      - AirportSub${filterLine}`);
+      }
+
+      if (state.services.youtube) {
+        groups.push(`  - name: 📺 YouTube\n    type: select\n    proxies:\n      - 🚀 节点选择\n    use:\n      - AirportSub`);
+      }
+      if (state.services.google) {
+        groups.push(`  - name: 🔍 Google\n    type: select\n    proxies:\n      - 🚀 节点选择\n    use:\n      - AirportSub`);
+      }
+      if (state.services.devtools) {
+        groups.push(`  - name: 💻 DevTools\n    type: select\n    proxies:\n      - 🚀 节点选择\n      - DIRECT\n    use:\n      - AirportSub`);
+      }
+      if (state.services.microsoft) {
+        groups.push(`  - name: ☁️ Microsoft\n    type: select\n    proxies:\n      - DIRECT\n      - 🚀 节点选择`);
+      }
+      if (state.services.apple) {
+        groups.push(`  - name: 🍎 Apple\n    type: select\n    proxies:\n      - DIRECT\n      - 🚀 节点选择`);
+      }
+      if (state.services.telegram) {
+        groups.push(`  - name: ✈️ Telegram\n    type: select\n    proxies:\n      - 🚀 节点选择\n    use:\n      - AirportSub`);
+      }
+
+      groups.push(
+`  - name: 🐟 漏网之鱼
+    type: select
+    proxies:
+      - 🚀 节点选择
+      - DIRECT`
+      );
+
+      // 3. Rules (Strict Ordering)
+      const rules = [];
+      rules.push('  # 1. 局域网与广告拦截');
+      rules.push('  - RULE-SET,private,DIRECT');
+      if (state.services.ads) rules.push('  - RULE-SET,category-ads-all,REJECT');
+
+      if (state.ai['category-ai-cn']) {
+        rules.push('');
+        rules.push('  # 2. 国内 AI 显式直连');
+        rules.push('  - RULE-SET,category-ai-cn,DIRECT');
+      }
+
+      const hasAnyForeignAi = state.ai['openai'] || state.ai['anthropic'] || state.ai['google-gemini'] || state.ai['xai'] || state.ai['perplexity'] || state.ai['category-ai-chat-!cn'];
+      if (hasAnyForeignAi) {
+        rules.push('');
+        rules.push('  # 3. 精细化海外 AI（必须排在兜底与 Google 之前）');
+        if (state.ai['openai']) rules.push('  - RULE-SET,openai,🤖 OpenAI');
+        if (state.ai['anthropic']) rules.push('  - RULE-SET,anthropic,🟠 Claude');
+        if (state.ai['google-gemini']) rules.push('  - RULE-SET,google-gemini,🔵 Gemini');
+        if (state.ai['xai']) rules.push('  - RULE-SET,xai,⚡ Grok & Perplexity');
+        if (state.ai['perplexity']) rules.push('  - RULE-SET,perplexity,⚡ Grok & Perplexity');
+        if (state.ai['category-ai-chat-!cn']) rules.push('  - RULE-SET,category-ai-chat-!cn,✨ Other AI');
+      }
+
+      rules.push('');
+      rules.push('  # 4. 常用应用服务');
+      if (state.services.youtube) rules.push('  - RULE-SET,youtube,📺 YouTube');
+      if (state.services.google) rules.push('  - RULE-SET,google,🔍 Google');
+      if (state.services.devtools) {
+        rules.push('  - RULE-SET,github,💻 DevTools');
+        rules.push('  - RULE-SET,gitlab,💻 DevTools');
+        rules.push('  - RULE-SET,atlassian,💻 DevTools');
+      }
+      if (state.services.microsoft) {
+        rules.push('  - RULE-SET,onedrive,☁️ Microsoft');
+        rules.push('  - RULE-SET,microsoft,☁️ Microsoft');
+      }
+      if (state.services.apple) {
+        rules.push('  - RULE-SET,icloud,🍎 Apple');
+        rules.push('  - RULE-SET,apple,🍎 Apple');
+      }
+      if (state.services.telegram) rules.push('  - RULE-SET,telegram,✈️ Telegram');
+
+      rules.push('');
+      rules.push('  # 5. 国内/海外域名分流');
+      rules.push('  - RULE-SET,geolocation-cn,DIRECT');
+      rules.push('  - RULE-SET,cn,DIRECT');
+      rules.push('  - RULE-SET,geolocation-!cn,🚀 节点选择');
+
+      rules.push('');
+      rules.push('  # 6. IP 规则置底 (启用 no-resolve)');
+      rules.push('  - RULE-SET,private-ip,DIRECT,no-resolve');
+      if (state.services.telegram) rules.push('  - RULE-SET,telegram-ip,✈️ Telegram,no-resolve');
+      if (state.services.google) rules.push('  - RULE-SET,google-ip,🔍 Google,no-resolve');
+      rules.push('  - RULE-SET,cn-ip,DIRECT,no-resolve');
+
+      rules.push('');
+      rules.push('  # 7. 最终兜底');
+      rules.push('  - MATCH,🐟 漏网之鱼');
+
+      return `mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+unified-delay: true
+tcp-concurrent: true
+
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+
+proxy-providers:
+  AirportSub:
+    type: http
+    url: "${subUrl}"
+    path: ./proxies/airport.yaml
+    interval: 3600
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+
+proxy-groups:
+${groups.join('\n')}
+
+rule-providers:
+${providers.map(k => buildProviderYamlLine(k, prefix, interval)).join('\n')}
+
+rules:
+${rules.join('\n')}
+`;
+    }
+
+    function generateJs() {
+      const prefix = getPrefix();
+      const interval = Math.max(300, Number(state.interval) || 86400);
+
+      const aiKeys = ['category-ai-cn', 'openai', 'anthropic', 'google-gemini', 'xai', 'perplexity', 'category-ai-chat-!cn']
+        .filter(k => state.ai[k]);
+
+      const providerLines = aiKeys.map(k => {
+        const def = PROVIDER_DEFS[k];
+        return `    "${k}": {
+      type: "http",
+      behavior: "${def.behavior}",
+      format: "mrs",
+      url: "${prefix}${def.path}",
+      path: "./ruleset/${k}.mrs",
+      interval: ${interval}
+    }`;
+      });
+
+      const groupLines = [];
+      if (state.ai['openai']) groupLines.push('    { name: "🤖 OpenAI", type: "select", proxies: aiProxies }');
+      if (state.ai['anthropic']) groupLines.push('    { name: "🟠 Claude", type: "select", proxies: aiProxies }');
+      if (state.ai['google-gemini']) groupLines.push('    { name: "🔵 Gemini", type: "select", proxies: aiProxies }');
+      if (state.ai['xai'] || state.ai['perplexity']) groupLines.push('    { name: "⚡ Grok & Perplexity", type: "select", proxies: aiProxies }');
+      if (state.ai['category-ai-chat-!cn']) groupLines.push('    { name: "✨ Other AI", type: "select", proxies: aiProxies }');
+
+      const ruleLines = [];
+      if (state.ai['category-ai-cn']) ruleLines.push('    "RULE-SET,category-ai-cn,DIRECT"');
+      if (state.ai['openai']) ruleLines.push('    "RULE-SET,openai,🤖 OpenAI"');
+      if (state.ai['anthropic']) ruleLines.push('    "RULE-SET,anthropic,🟠 Claude"');
+      if (state.ai['google-gemini']) ruleLines.push('    "RULE-SET,google-gemini,🔵 Gemini"');
+      if (state.ai['xai']) ruleLines.push('    "RULE-SET,xai,⚡ Grok & Perplexity"');
+      if (state.ai['perplexity']) ruleLines.push('    "RULE-SET,perplexity,⚡ Grok & Perplexity"');
+      if (state.ai['category-ai-chat-!cn']) ruleLines.push('    "RULE-SET,category-ai-chat-!cn,✨ Other AI"');
+
+      return `// Clash Verge Rev 全局扩展脚本 (Mihomo 内核)
+// 自动注入 MetaCubeX/meta-rules-dat (.mrs) 精细化 AI 分流规则
+
+function main(config) {
+  // 1. 注入 .mrs 二进制规则集
+  const aiRuleProviders = {
+${providerLines.join(',\n')}
+  };
+
+  config["rule-providers"] = {
+    ...(config["rule-providers"] || {}),
+    ...aiRuleProviders
+  };
+
+  // 2. 过滤 AI 策略组可用节点
+  const allProxies = (config.proxies || []).map(p => p.name);
+  const excludeHk = ${state.excludeHk};
+  const filtered = excludeHk
+    ? allProxies.filter(name => !/${EXCLUDE_REGEX}/i.test(name))
+    : allProxies;
+  const aiProxies = filtered.length > 0 ? filtered : allProxies;
+
+  // 3. 创建独立 AI 策略组并置顶
+  const aiGroups = [
+${groupLines.join(',\n')}
+  ];
+
+  config["proxy-groups"] = [...aiGroups, ...(config["proxy-groups"] || [])];
+
+  // 4. 将 AI 规则前置插入，防止被原有规则截胡
+  const aiRules = [
+${ruleLines.join(',\n')}
+  ];
+
+  config.rules = [...aiRules, ...(config.rules || [])];
+
+  return config;
+}
+`;
+    }
+
+    function updatePreview() {
+      currentOutput = state.mode === 'yaml' ? generateYaml() : generateJs();
+      document.getElementById('code-output').textContent = currentOutput;
+    }
+
+    // =========================================================================
+    // Copy & Download Actions
+    // =========================================================================
+    let copyTimer = null;
+    function copyCode() {
+      const textarea = document.createElement('textarea');
+      textarea.value = currentOutput;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        const label = document.getElementById('copy-label');
+        label.textContent = '已复制';
+        clearTimeout(copyTimer);
+        copyTimer = setTimeout(() => {
+          label.textContent = '复制';
+        }, 1800);
+      } catch (err) {
+        // Fallback silent
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function downloadCode() {
+      const filename = state.mode === 'yaml' ? 'ai-route-subconvert.yaml' : 'ai-route-subconvert-override.js';
+      const mime = state.mode === 'yaml' ? 'text/yaml;charset=utf-8' : 'application/javascript;charset=utf-8';
+      const blob = new Blob([currentOutput], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // =========================================================================
+    // Event Listeners
+    // =========================================================================
+    document.getElementById('sub-url').addEventListener('input', e => {
+      state.subUrl = e.target.value;
+      updatePreview();
+    });
+
+    document.getElementById('exclude-hk').addEventListener('change', e => {
+      state.excludeHk = e.target.checked;
+      updatePreview();
+    });
+
+    document.getElementById('cdn-select').addEventListener('change', e => {
+      state.cdn = e.target.value;
+      const customBox = document.getElementById('custom-prefix-box');
+      if (state.cdn === 'custom') {
+        customBox.classList.remove('hidden');
+      } else {
+        customBox.classList.add('hidden');
+      }
+      updatePreview();
+    });
+
+    document.getElementById('custom-prefix').addEventListener('input', e => {
+      state.customPrefix = e.target.value;
+      updatePreview();
+    });
+
+    document.getElementById('sync-interval').addEventListener('input', e => {
+      state.interval = Number(e.target.value) || 86400;
+      updatePreview();
+    });
+
+    // Init
+    renderCheckboxes();
+    setMode('yaml');
+  </script>
+</body>
+</html>

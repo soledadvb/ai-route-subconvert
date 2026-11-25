@@ -2,6 +2,12 @@
 
 按 AI 服务分类分流的订阅工具。当前版本接入转换后的节点订阅，通过 Cloudflare Pages 生成 Mihomo 配置，内置 OpenAI、Claude、Gemini 等策略组。
 
+## 网页使用
+
+打开部署域名首页，填入节点订阅链接，按需选择 AI 分类和常用服务，然后复制或下载生成的 YAML。Clash Verge Rev 用户也可以切换到覆写脚本模式。
+
+网页文件为 `ai-route-subconvert.html`。Cloudflare Pages 构建时会将它作为站点首页发布。
+
 ## 部署到 Cloudflare Pages
 
 在 Cloudflare 控制台进入 **Workers & Pages → Create application → Pages → Connect to Git**，授权 GitHub 并选择本仓库。
