@@ -195,6 +195,10 @@
         </div>
 
         <div class="flex items-center gap-2">
+          <button id="btn-link" type="button" onclick="createLink()"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-50">
+            生成订阅链接
+          </button>
           <button
             id="btn-copy"
             type="button"
@@ -218,6 +222,16 @@
             <span>下载文件</span>
           </button>
         </div>
+      </div>
+
+      <div id="link-panel" class="hidden space-y-2 border-b border-zinc-800 px-4 py-3 text-xs">
+        <label for="link-url" class="text-zinc-300">远程配置链接</label>
+        <div class="flex flex-wrap gap-2">
+          <input id="link-url" type="text" readonly class="flex-1 min-w-0 rounded-lg bg-zinc-950 px-3 py-2" />
+          <button id="btn-link-copy" type="button" onclick="copyLink()" disabled
+            class="rounded-lg bg-zinc-800 px-3 py-2 disabled:opacity-50">复制链接</button>
+        </div>
+        <p id="link-status" role="status" class="text-zinc-400"></p>
       </div>
 
       <!-- Code Area -->
@@ -370,6 +384,8 @@
 
     function setMode(mode) {
       state.mode = mode;
+      document.getElementById('btn-link').classList.toggle('hidden', mode !== 'yaml');
+      document.getElementById('link-panel').classList.add('hidden');
       const tabYaml = document.getElementById('tab-yaml');
       const tabJs = document.getElementById('tab-js');
       const filename = document.getElementById('preview-filename');
@@ -703,6 +719,63 @@ ${ruleLines.join(',\n')}
         // Fallback silent
       }
       document.body.removeChild(textarea);
+    }
+
+    // 生成链接时保存当前 YAML 快照。之后的页面调整需要重新生成链接。
+    async function createLink() {
+      const button = document.getElementById('btn-link');
+      const panel = document.getElementById('link-panel');
+      const status = document.getElementById('link-status');
+      const field = document.getElementById('link-url');
+      const copy = document.getElementById('btn-link-copy');
+      panel.classList.remove('hidden');
+      field.value = '';
+      copy.disabled = true;
+      try {
+        const upstream = new URL(state.subUrl.trim());
+        if (upstream.protocol !== 'https:' || upstream.hostname === 'example.com' ||
+            upstream.username || upstream.password) throw new Error();
+      } catch {
+        status.textContent = '请先填写自己的 HTTPS 节点订阅链接。';
+        return;
+      }
+      button.disabled = true;
+      status.textContent = '正在生成链接…';
+      try {
+        const result = await fetch('/api/subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/yaml' },
+          body: currentOutput,
+        });
+        if (result.status === 503) {
+          status.textContent = '站点尚未配置订阅密钥，请联系管理员。';
+          return;
+        }
+        if (result.status === 413) {
+          status.textContent = '配置过长，请减少规则或缩短节点订阅地址。';
+          return;
+        }
+        if (!result.ok) throw new Error();
+        const { url } = await result.json();
+        field.value = url;
+        copy.disabled = false;
+        status.textContent = '可作为远程配置导入客户端。持有链接的人可以读取配置，请妥善保管。';
+      } catch {
+        status.textContent = '生成失败，请稍后重试。';
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function copyLink() {
+      const field = document.getElementById('link-url');
+      try {
+        await navigator.clipboard.writeText(field.value);
+        document.getElementById('link-status').textContent = '已复制，可粘贴到客户端。请妥善保管链接。';
+      } catch {
+        field.select();
+        document.getElementById('link-status').textContent = '请手动复制已选中的链接。';
+      }
     }
 
     function downloadCode() {

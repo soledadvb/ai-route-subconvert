@@ -22,7 +22,19 @@
 
 在客户端添加远程配置 `https://<项目名>.pages.dev/api/config`，刷新后在「🚀 节点选择」中查看「演示直连（仅用于测试）」。演示节点会直接连接目标，只用于确认客户端能拉取配置和节点。
 
-## 接入自己的转换订阅
+## 生成带分流的订阅链接
+
+在 Cloudflare Pages 项目的生产环境添加 Secret `SUB_LINK_KEY`，值为 32 个随机字节组成的 64 位十六进制字符串。可在终端运行以下命令生成，直接粘贴到 Cloudflare 控制台：
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+保存后部署。打开首页，填入 HTTPS 节点订阅地址，勾选分流选项，再按「生成订阅链接」。复制地址并作为远程配置导入 Clash Verge。链接保存生成时的配置，之后修改选项需要重新生成。Mihomo 仍按配置定时从上游更新节点。
+
+链接持有者可读取完整配置和其中的节点订阅地址。请私下保存链接。保留同一个 `SUB_LINK_KEY` 才能继续使用已生成的链接，替换密钥会使旧链接失效。此功能无需数据库。
+
+## 配置固定的服务端订阅
 
 在 Pages 项目 **Settings → Variables and Secrets** 的生产环境添加下列两个 Secret，保存后重新部署：
 
