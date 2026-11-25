@@ -1,5 +1,6 @@
 const maxYaml = 24 * 1024;
 const maxToken = 6000;
+const shortId = /^[0-9a-f]{48}$/;
 const privateHeaders = {
   'Cache-Control': 'no-store',
   'Referrer-Policy': 'no-referrer',
@@ -45,7 +46,7 @@ async function createSub(request, env) {
     return fail('Unsupported content type.', 415);
   }
   const key = await importKey(env.SUB_LINK_KEY);
-  if (!key) return fail('Subscription link key is unavailable.', 503);
+  if (!key || !env.SUBSCRIPTIONS) return fail('Subscription storage is unavailable.', 503);
   const body = await readBody(request);
   if (!body) return fail('Configuration too large.', 413);
   const yaml = new TextDecoder().decode(body);
@@ -59,24 +60,49 @@ async function createSub(request, env) {
   const bytes = new Uint8Array(iv.length + encrypted.byteLength);
   bytes.set(iv);
   bytes.set(new Uint8Array(encrypted), iv.length);
-  if (bytes.length > Math.floor(maxToken * 3 / 4)) return fail('Subscription link too long.', 413);
-  const token = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-  const url = new URL('/sub/v1/' + token, request.url);
+  // 短链接只携带 192 位随机编号。KV 只保存加密后的配置，不写入明文订阅地址。
+  const id = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte => (
+    byte.toString(16).padStart(2, '0')
+  )).join('');
+  try {
+    await env.SUBSCRIPTIONS.put('v2:' + id, bytes.buffer);
+  } catch {
+    return fail('Subscription storage is temporarily unavailable.', 503);
+  }
+  const url = new URL('/sub/v2/' + id, request.url);
   return Response.json({ url: url.href }, { status: 201, headers: privateHeaders });
 }
 
-// 链接本身就是访问凭据。认证失败统一返回 404，避免把解密信息返回给请求方。
+// 链接本身就是访问凭据。读取旧版长链接，同时支持新版随机编号。
 async function getSub(request, env) {
   if (request.method !== 'GET') return fail('Method not allowed.', 405, { Allow: 'GET' });
   const path = new URL(request.url).pathname;
-  const token = path.slice('/sub/v1/'.length);
-  if (!/^[A-Za-z0-9_-]+$/.test(token) || token.length < 40 || token.length > maxToken) {
-    return fail('Not found.', 404);
+  const id = path.slice('/sub/v1/'.length);
+  let bytes;
+  if (path.startsWith('/sub/v2/')) {
+    if (!shortId.test(id)) return fail('Not found.', 404);
+    if (!env.SUBSCRIPTIONS) return fail('Subscription storage is unavailable.', 503);
+    let encrypted;
+    try {
+      encrypted = await env.SUBSCRIPTIONS.get('v2:' + id, 'arrayBuffer');
+    } catch {
+      return fail('Subscription storage is temporarily unavailable.', 503);
+    }
+    if (!encrypted) return fail('Not found.', 404);
+    bytes = new Uint8Array(encrypted);
+  } else {
+    if (!/^[A-Za-z0-9_-]+$/.test(id) || id.length < 40 || id.length > maxToken) {
+      return fail('Not found.', 404);
+    }
+    try {
+      bytes = Uint8Array.from(atob(id.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
+    } catch {
+      return fail('Not found.', 404);
+    }
   }
   const key = await importKey(env.SUB_LINK_KEY);
   if (!key) return fail('Subscription link key is unavailable.', 503);
   try {
-    const bytes = Uint8Array.from(atob(token.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
     const compressed = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: bytes.subarray(0, 12), additionalData: tokenContext }, key, bytes.subarray(12),
     );
@@ -135,7 +161,7 @@ export default {
   fetch(request, env) {
     const path = new URL(request.url).pathname;
     if (path === '/api/subscriptions') return createSub(request, env);
-    if (path.startsWith('/sub/v1/')) return getSub(request, env);
+    if (path.startsWith('/sub/v1/') || path.startsWith('/sub/v2/')) return getSub(request, env);
     if (path === '/api/config') {
       if (request.method !== 'GET') {
         return new Response('Method not allowed.', { status: 405, headers: { Allow: 'GET' } });

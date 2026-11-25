@@ -748,7 +748,7 @@ ${ruleLines.join(',\n')}
           body: currentOutput,
         });
         if (result.status === 503) {
-          status.textContent = '站点尚未配置订阅密钥，请联系管理员。';
+          status.textContent = '暂时无法生成链接，请稍后重试或联系管理员。';
           return;
         }
         if (result.status === 413) {
