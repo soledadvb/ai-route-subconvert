@@ -111,7 +111,9 @@ async function getSub(request, env) {
       headers: {
         ...privateHeaders,
         'Content-Type': 'application/yaml; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="ai-route-subconvert.yaml"',
+        // Clash Verge 优先解析 filename*，旧版客户端可读取不带引号的备用名称。
+        'Content-Disposition': "attachment; filename=AI-Route-Subconvert; filename*=UTF-8''AI%20Route%20Subconvert",
+        'Profile-Title': 'AI Route Subconvert',
       },
     });
   } catch {
