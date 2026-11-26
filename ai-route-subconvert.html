@@ -109,13 +109,29 @@
           />
         </div>
 
-        <label id="claude-profile" class="flex items-start gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer">
-          <input id="claude-only" type="checkbox" class="mt-0.5 w-4 h-4" />
-          <span class="text-xs text-zinc-200">
-            <strong class="block">Claude 专用模式</strong>
-            国内域名白名单和私有网络默认直连，广告默认拦截，其余流量走代理。适用于 Mihomo 和 Clash Verge Rev。
-          </span>
-        </label>
+        <div id="claude-profile" class="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-xs sm:text-sm font-medium text-zinc-200">分流模式</div>
+              <div id="claude-mode-label" class="text-[11px] text-zinc-500">普通模式</div>
+            </div>
+            <button
+              id="claude-mode-switch"
+              type="button"
+              role="switch"
+              aria-checked="false"
+              aria-label="切换普通模式和兜底模式"
+              onclick="toggleClaudeMode()"
+              class="relative inline-flex h-6 w-11 shrink-0 rounded-full bg-zinc-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            >
+              <span id="claude-mode-knob" class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform"></span>
+            </button>
+          </div>
+          <div class="mt-2 space-y-1 text-[11px] text-zinc-400">
+            <p><span class="font-medium text-zinc-300">普通模式</span>：沿用下方 AI 与常用服务分流。</p>
+            <p><span class="font-medium text-zinc-300">兜底模式</span>：国内直连白名单和私有网络直连，广告默认拦截，其余流量全部走「非国内」代理组。</p>
+          </div>
+        </div>
 
         <label id="node-filter" class="flex items-start gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer hover:border-zinc-700 transition-colors">
           <input
@@ -910,6 +926,22 @@ ${ruleLines.join(',\n')}
       return state.claudeOnly && ['mihomo', 'js'].includes(state.mode);
     }
 
+    function renderClaudeMode() {
+      const enabled = state.claudeOnly;
+      const control = document.getElementById('claude-mode-switch');
+      control.setAttribute('aria-checked', String(enabled));
+      control.className = `relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40 ${enabled ? 'bg-indigo-500' : 'bg-zinc-700'}`;
+      document.getElementById('claude-mode-knob').className = `absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`;
+      document.getElementById('claude-mode-label').textContent = enabled ? '兜底模式' : '普通模式';
+    }
+
+    function toggleClaudeMode() {
+      state.claudeOnly = !state.claudeOnly;
+      document.getElementById('link-panel').classList.add('hidden');
+      renderClaudeMode();
+      updatePreview();
+    }
+
     function generateClaude(script = false) {
       const group = '非国内';
       const ads = '🛑 广告拦截';
@@ -996,6 +1028,7 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
 
     function updatePreview() {
       const claude = isClaude();
+      renderClaudeMode();
       document.getElementById('claude-profile').classList.toggle('hidden', !['mihomo', 'js'].includes(state.mode));
       document.getElementById('node-filter').classList.toggle('hidden', claude);
       document.getElementById('ai-heading').parentElement.parentElement.classList.toggle('hidden', claude);
@@ -1149,12 +1182,6 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
     // =========================================================================
     document.getElementById('sub-url').addEventListener('input', e => {
       state.subUrl = e.target.value;
-      updatePreview();
-    });
-
-    document.getElementById('claude-only').addEventListener('change', event => {
-      state.claudeOnly = event.target.checked;
-      document.getElementById('link-panel').classList.add('hidden');
       updatePreview();
     });
 
