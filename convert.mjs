@@ -280,13 +280,19 @@ function addSingboxRules(body, options) {
   config.dns = {
     servers: [
       { type: 'udp', tag: 'dns_direct', server: '223.5.5.5' },
-      { type: 'udp', tag: 'dns_proxy', server: '1.1.1.1', detour: 'NodeSelect' },
+      { type: 'udp', tag: 'dns_proxy', server: '1.1.1.1', detour: options.fallback ? '非国内' : 'NodeSelect' },
       { type: 'fakeip', tag: 'dns_fakeip', inet4_range: '198.18.0.0/15' },
     ],
-    rules: [
-      { rule_set: 'geosite-geolocation-!cn', query_type: ['A', 'AAAA'], server: 'dns_fakeip' },
-      { rule_set: 'geosite-geolocation-!cn', server: 'dns_proxy' },
-    ],
+    rules: options.fallback
+      ? [
+          { rule_set: 'geosite-geolocation-cn', server: 'dns_direct' },
+          { rule_set: 'geosite-cn', server: 'dns_direct' },
+          { server: 'dns_proxy' },
+        ]
+      : [
+          { rule_set: 'geosite-geolocation-!cn', query_type: ['A', 'AAAA'], server: 'dns_fakeip' },
+          { rule_set: 'geosite-geolocation-!cn', server: 'dns_proxy' },
+        ],
     final: 'dns_direct',
   };
   for (const inbound of config.inbounds || []) {
