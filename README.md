@@ -46,3 +46,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
 本地预览可使用 `npx wrangler pages dev public --kv=SUBSCRIPTIONS`，在项目根目录的 `.dev.vars` 中填写测试用的 `SUB_LINK_KEY`。线上 API 和 KV 绑定方式见 [Cloudflare Pages 文档](https://developers.cloudflare.com/pages/functions/bindings/)。
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。
