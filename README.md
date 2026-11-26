@@ -1,53 +1,48 @@
 # AI Route Subconvert
-网页支持选择 subapi.fxxk.dedyn.io、subapi.cmliussss.net 或 api.v1.mk。完整上游地址会发送至所选后端，链接保存后端选择，切换后需要重新生成。配置预览默认折叠，点击「查看配置预览」展开。AI 过滤包含香港、国内，以及流量、到期、重置、剩余等提示名称。
 
+把节点订阅生成一份带有 AI 和常用服务分流规则的 Mihomo 配置。可以直接复制、下载 YAML，或生成短订阅链接导入 Clash Verge Rev。
 
-按 AI 服务分类分流的订阅工具。当前版本接入转换后的节点订阅，通过 Cloudflare Pages 生成 Mihomo 配置，内置 OpenAI、Claude、Gemini 等策略组。
+**[在线使用](https://ai-route-subconvert.pages.dev/)** · [提交问题](https://github.com/soledadvb/ai-route-subconvert/issues)
 
-## 网页使用
+## 快速开始
 
-打开部署域名首页，填入节点订阅链接，按需选择 AI 分类和常用服务，然后复制或下载生成的 YAML。Clash Verge Rev 用户也可以切换到覆写脚本模式。
+1. 打开网页，粘贴 HTTPS 节点订阅或 `ss://`、`vmess://`、`trojan://` 节点链接。
+2. 选择转换后端，按需要勾选 AI 与常用服务分类。规则同步周期按小时填写，默认 24 小时。
+3. 点击 **生成订阅链接**，将短链接作为远程订阅导入 Clash Verge Rev。也可以点击 **复制** 或 **下载文件**，直接获取完整 YAML。
 
-网页文件为 `ai-route-subconvert.html`。Cloudflare Pages 构建时会将它作为站点首页发布。
+远程订阅每次刷新都会向所选后端获取最新节点，并应用生成链接时选择的分流规则。修改勾选项或切换后端后，重新生成链接即可。
 
-## 部署到 Cloudflare Pages
+## 分流功能
 
-在 Cloudflare 控制台进入 **Workers & Pages → Create application → Pages → Connect to Git**，授权 GitHub 并选择本仓库。
-
-| 设置 | 值 |
+| 分类 | 支持范围 |
 | --- | --- |
-| Production branch | `main` |
-| Framework preset | `None` |
-| Root directory | 留空 |
-| Build command | `node build.mjs` |
-| Build output directory | `public` |
+| AI | OpenAI、Claude、Gemini、Grok、Perplexity、其他海外 AI 和国内 AI |
+| 常用服务 | YouTube、Netflix、Disney+、Prime Video、Spotify、TikTok、Telegram、Google、开发工具等 |
+| 基础分流 | 私有网络、国内服务默认直连。非中国默认跟随「节点选择」。广告拦截组可在拦截与直连之间切换 |
 
-在客户端添加远程配置 `https://<项目名>.pages.dev/api/config`，刷新后在「🚀 节点选择」中查看「演示直连（仅用于测试）」。演示节点会直接连接目标，只用于确认客户端能拉取配置和节点。
+- AI 策略组可排除香港、国内节点，以及流量、剩余、到期和重置等提示项。
+- 规则集使用 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 的 `.mrs` 文件，支持 GitHub、镜像和自定义地址。
+- **覆写脚本** 模式可为 Clash Verge Rev 已有的订阅添加 AI 分流规则。在网页右侧点击 **查看配置预览** 可展开输出。
 
-## 生成带分流的订阅链接
+## 订阅地址与转换后端
 
-在 Cloudflare Pages 项目的生产环境添加 Secret `SUB_LINK_KEY`，值为 32 个随机字节组成的 64 位十六进制字符串。可在终端运行以下命令生成，直接粘贴到 Cloudflare 控制台：
+页面提供 `subapi.fxxk.dedyn.io`、`subapi.cmliussss.net` 和 `api.v1.mk` 三个公共后端。生成或刷新订阅时，所选后端会收到完整上游地址。短链接持有者可以读取生成的节点配置，请私下保管这些链接。
+
+## 自行部署
+
+项目使用 Node.js 22 构建。克隆仓库后执行：
+
+```sh
+npm ci
+node build.mjs
+```
+
+在 Cloudflare Pages 连接 Git 仓库，选择 `main` 为生产分支，构建命令填 `node build.mjs`，输出目录填 `public`。
+
+为启用短链接，在目标环境绑定名为 `SUBSCRIPTIONS` 的 Workers KV 命名空间，并设置 `SUB_LINK_KEY` 机密。用下面的命令生成 64 位十六进制密钥，填入控制台。更换密钥会使之前生成的链接失效。
 
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-在生产环境的「绑定」中添加 KV 命名空间，绑定名称填 `SUBSCRIPTIONS`。保存后重新部署。打开首页，填入 HTTPS 节点订阅地址，勾选分流选项，再按「生成订阅链接」。复制地址并作为远程配置导入 Clash Verge。链接保存生成时的配置，之后修改选项需要重新生成。Mihomo 仍按配置定时从上游更新节点。
-
-链接持有者可读取完整配置和其中的节点订阅地址。请私下保存链接。保留同一个 `SUB_LINK_KEY` 才能继续使用已生成的链接，替换密钥会使旧链接失效。短链接使用 KV 保存加密后的配置，访客可用随机链接读取自己生成的配置。原来的长链接仍可读取。
-
-## 配置固定的服务端订阅
-
-在 Pages 项目 **Settings → Variables and Secrets** 的生产环境添加下列两个 Secret，保存后重新部署：
-
-- `NODE_SUB_URL` 填入转换后的 HTTPS 节点订阅地址。
-- `CONFIG_KEY` 填入至少 32 字符的随机密钥，建议使用十六进制字符串。
-
-客户端的远程配置地址改为 `https://<项目名>.pages.dev/api/config?key=<CONFIG_KEY>`。该地址用于更新整份配置，Mihomo 也会按模板的 `interval: 3600` 单独刷新节点。以后在 Pages 替换 `NODE_SUB_URL` 并重新部署，客户端继续使用同一个配置地址，更新配置后获取新的节点订阅。
-
-`NODE_SUB_URL` 应指向 Mihomo 可用的节点订阅，例如带有顶层 `proxies:` 的节点 YAML。配置地址和客户端收到的 YAML 都可能包含凭据，请按私有订阅保管。
-
-## 本地预览
-
-运行 `node build.mjs` 后执行 `npx wrangler pages dev public`，访问 Wrangler 打印的本地地址加 `/api/config`。真实订阅可通过本地 `.dev.vars` 注入。
-新版网页通过 subapi.fxxk.dedyn.io 转换节点，公共后端会收到完整上游地址。新链接使用 /sub/v3/，每次获取都会重新转换，并将节点写入 proxies 和分流组。旧链接继续使用原先的配置方式。
+本地预览可使用 `npx wrangler pages dev public --kv=SUBSCRIPTIONS`，在项目根目录的 `.dev.vars` 中填写测试用的 `SUB_LINK_KEY`。线上 API 和 KV 绑定方式见 [Cloudflare Pages 文档](https://developers.cloudflare.com/pages/functions/bindings/)。
