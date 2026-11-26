@@ -87,9 +87,19 @@
       <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-4">
         <h2 class="text-sm font-semibold text-white">订阅与节点过滤</h2>
 
+        <div id="backend-group" class="space-y-1.5">
+          <label for="backend-select" class="block text-xs font-medium text-zinc-300">转换后端</label>
+          <select id="backend-select" class="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-100">
+            <option value="https://subapi.fxxk.dedyn.io/sub">subapi.fxxk.dedyn.io</option>
+            <option value="https://subapi.cmliussss.net/sub">subapi.cmliussss.net</option>
+            <option value="https://api.v1.mk/sub">api.v1.mk</option>
+          </select>
+          <p class="text-xs text-zinc-500">完整订阅地址会发送至所选公共后端。切换后端后请重新生成链接。</p>
+        </div>
+
         <div id="sub-url-group" class="space-y-1.5">
           <label for="sub-url" class="block text-xs font-medium text-zinc-300">
-            节点订阅链接 <span class="text-zinc-500 font-normal">生成、复制或下载 YAML 时，完整订阅地址将发送至公共后端 subapi.fxxk.dedyn.io。</span>
+            节点订阅链接 <span class="text-zinc-500 font-normal">支持 HTTPS 订阅和节点分享链接。</span>
           </label>
           <input
             id="sub-url"
@@ -109,7 +119,7 @@
           />
           <div class="min-w-0">
             <div class="text-xs sm:text-sm font-medium text-zinc-200">AI 策略组自动排除香港/国内/无效节点</div>
-            <div class="text-[11px] font-mono text-zinc-500 mt-0.5 break-all">正则：港|HK|Hong|中国|CN|官网|到期|流量</div>
+            <div class="text-[11px] font-mono text-zinc-500 mt-0.5 break-all">正则：港|HK|Hong|中国|CN|官网|到期|流量|重置|剩余|套餐|过期|有效期|订阅|网址|公告|Expire|Traffic|Reset</div>
           </div>
         </label>
       </div>
@@ -235,9 +245,12 @@
       </div>
 
       <!-- Code Area -->
-      <div class="flex-1 overflow-auto bg-[#0b0b0e] p-4 min-h-[460px]">
-        <pre class="text-xs leading-relaxed font-mono text-zinc-300 whitespace-pre"><code id="code-output"></code></pre>
-      </div>
+      <details id="code-preview" class="bg-[#0b0b0e]">
+        <summary class="cursor-pointer px-4 py-3 text-sm text-zinc-300">查看配置预览</summary>
+        <div class="overflow-auto p-4 max-h-[60vh]">
+          <pre class="text-xs leading-relaxed font-mono text-zinc-300 whitespace-pre"><code id="code-output"></code></pre>
+        </div>
+      </details>
     </section>
 
   </main>
@@ -251,7 +264,7 @@
       jsdelivr: 'https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/',
     };
 
-    const EXCLUDE_REGEX = '港|HK|Hong|中国|CN|官网|到期|流量';
+    const EXCLUDE_REGEX = '港|HK|Hong|中国|CN|官网|到期|流量|重置|剩余|套餐|过期|有效期|订阅|网址|公告|Expire|Traffic|Reset';
 
     const AI_ITEMS = [
       { id: 'category-ai-cn', label: '国内 AI 直连', target: 'DIRECT' },
@@ -391,6 +404,7 @@
       const filename = document.getElementById('preview-filename');
       const subUrlGroup = document.getElementById('sub-url-group');
       const commonCard = document.getElementById('common-services-card');
+      document.getElementById('backend-group').classList.toggle('hidden', mode !== 'yaml');
 
       if (mode === 'yaml') {
         tabYaml.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm';
@@ -701,10 +715,16 @@ ${ruleLines.join(',\n')}
     // =========================================================================
     let copyTimer = null;
     // 获取最终 YAML 后再复制或下载，保证导出文件和远程订阅均包含节点。
+    // 请求使用当前后端，短链接会加密保存这次选择。
+    function requestBody() {
+      return generateYaml() + '\nx-ai-route-backend: ' +
+        JSON.stringify(document.getElementById('backend-select').value) + '\n';
+    }
+
     async function exportText() {
       if (state.mode !== 'yaml') return currentOutput;
       const result = await fetch('/api/convert', {
-        method: 'POST', headers: { 'Content-Type': 'application/yaml' }, body: generateYaml(),
+        method: 'POST', headers: { 'Content-Type': 'application/yaml' }, body: requestBody(),
       });
       if (!result.ok) throw new Error(await result.text());
       const text = await result.text();
@@ -756,7 +776,7 @@ ${ruleLines.join(',\n')}
         const result = await fetch('/api/inline', {
           method: 'POST',
           headers: { 'Content-Type': 'application/yaml' },
-          body: currentOutput,
+          body: requestBody(),
         });
         if (result.status === 503) {
           status.textContent = '暂时无法生成链接，请稍后重试或联系管理员。';
@@ -836,6 +856,14 @@ ${ruleLines.join(',\n')}
 
     document.getElementById('sync-interval').addEventListener('input', e => {
       state.interval = Number(e.target.value) || 86400;
+      updatePreview();
+    });
+
+    // 切换后端后清除旧链接，避免把先前结果当成当前后端生成的配置。
+    document.getElementById('backend-select').addEventListener('change', () => {
+      document.getElementById('link-url').value = '';
+      document.getElementById('btn-link-copy').disabled = true;
+      document.getElementById('link-panel').classList.add('hidden');
       updatePreview();
     });
 

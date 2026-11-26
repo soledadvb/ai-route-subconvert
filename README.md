@@ -1,4 +1,6 @@
 # AI Route Subconvert
+网页支持选择 subapi.fxxk.dedyn.io、subapi.cmliussss.net 或 api.v1.mk。完整上游地址会发送至所选后端，链接保存后端选择，切换后需要重新生成。配置预览默认折叠，点击「查看配置预览」展开。AI 过滤包含香港、国内，以及流量、到期、重置、剩余等提示名称。
+
 
 按 AI 服务分类分流的订阅工具。当前版本接入转换后的节点订阅，通过 Cloudflare Pages 生成 Mihomo 配置，内置 OpenAI、Claude、Gemini 等策略组。
 

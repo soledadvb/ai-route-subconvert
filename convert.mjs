@@ -1,8 +1,12 @@
 import { parse, stringify } from 'yaml';
 
 // 只从固定的转换服务接收节点，保留本地模板中的规则和策略组。
-const endpoint = 'https://subapi.fxxk.dedyn.io/sub';
-const excluded = /港|HK|Hong|中国|CN|官网|到期|流量/i;
+export const backends = [
+  'https://subapi.fxxk.dedyn.io/sub',
+  'https://subapi.cmliussss.net/sub',
+  'https://api.v1.mk/sub',
+];
+const excluded = /港|HK|Hong|中国|CN|官网|到期|流量|重置|剩余|套餐|过期|有效期|订阅|网址|公告|Expire|Traffic|Reset/i;
 
 export async function convert(text, send = (url, init) => fetch(url, init)) {
   const config = parse(text, { maxAliasCount: 0 });
@@ -12,6 +16,10 @@ export async function convert(text, send = (url, init) => fetch(url, init)) {
   const upstream = new URL(source);
   if (!['https:', 'ss:', 'vmess:', 'trojan:'].includes(upstream.protocol) ||
       /[\s|]/.test(source)) throw Error('请输入有效的 HTTPS 订阅或节点分享链接。');
+  // 链接记录用户选择的后端。固定名单防止被当作任意服务器的请求转发接口。
+  const endpoint = config['x-ai-route-backend'] || backends[0];
+  if (!backends.includes(endpoint)) throw Error('分流模板中的后端无效。');
+  delete config['x-ai-route-backend'];
   const api = new URL(endpoint);
   api.search = new URLSearchParams({ target: 'clash', list: 'true', url: source }).toString();
   const controller = new AbortController();
