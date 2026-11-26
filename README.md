@@ -48,3 +48,4 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ## 本地预览
 
 运行 `node build.mjs` 后执行 `npx wrangler pages dev public`，访问 Wrangler 打印的本地地址加 `/api/config`。真实订阅可通过本地 `.dev.vars` 注入。
+新版网页通过 subapi.fxxk.dedyn.io 转换节点，公共后端会收到完整上游地址。新链接使用 /sub/v3/，每次获取都会重新转换，并将节点写入 proxies 和分流组。旧链接继续使用原先的配置方式。

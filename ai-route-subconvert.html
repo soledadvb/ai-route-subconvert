@@ -89,7 +89,7 @@
 
         <div id="sub-url-group" class="space-y-1.5">
           <label for="sub-url" class="block text-xs font-medium text-zinc-300">
-            节点订阅链接 <span class="text-zinc-500 font-normal">(用于 YAML proxy-providers)</span>
+            节点订阅链接 <span class="text-zinc-500 font-normal">生成、复制或下载 YAML 时，完整订阅地址将发送至公共后端 subapi.fxxk.dedyn.io。</span>
           </label>
           <input
             id="sub-url"
@@ -596,7 +596,7 @@ dns:
 proxy-providers:
   AirportSub:
     type: http
-    url: "${subUrl}"
+    url: ${JSON.stringify(subUrl)}
     path: ./proxies/airport.yaml
     interval: 3600
     health-check:
@@ -700,9 +700,21 @@ ${ruleLines.join(',\n')}
     // Copy & Download Actions
     // =========================================================================
     let copyTimer = null;
-    function copyCode() {
+    // 获取最终 YAML 后再复制或下载，保证导出文件和远程订阅均包含节点。
+    async function exportText() {
+      if (state.mode !== 'yaml') return currentOutput;
+      const result = await fetch('/api/convert', {
+        method: 'POST', headers: { 'Content-Type': 'application/yaml' }, body: generateYaml(),
+      });
+      if (!result.ok) throw new Error(await result.text());
+      const text = await result.text();
+      document.getElementById('code-output').textContent = text;
+      return text;
+    }
+
+    async function copyCode() {
       const textarea = document.createElement('textarea');
-      textarea.value = currentOutput;
+      try { textarea.value = await exportText(); } catch (err) { alert(err.message); return; }
       textarea.style.position = 'fixed';
       textarea.style.opacity = '0';
       document.body.appendChild(textarea);
@@ -733,8 +745,7 @@ ${ruleLines.join(',\n')}
       copy.disabled = true;
       try {
         const upstream = new URL(state.subUrl.trim());
-        if (upstream.protocol !== 'https:' || upstream.hostname === 'example.com' ||
-            upstream.username || upstream.password) throw new Error();
+        if (!['https:', 'ss:', 'vmess:', 'trojan:'].includes(upstream.protocol) || upstream.hostname === 'example.com') throw new Error();
       } catch {
         status.textContent = '请先填写自己的 HTTPS 节点订阅链接。';
         return;
@@ -742,7 +753,7 @@ ${ruleLines.join(',\n')}
       button.disabled = true;
       status.textContent = '正在生成链接…';
       try {
-        const result = await fetch('/api/subscriptions', {
+        const result = await fetch('/api/inline', {
           method: 'POST',
           headers: { 'Content-Type': 'application/yaml' },
           body: currentOutput,
@@ -755,7 +766,7 @@ ${ruleLines.join(',\n')}
           status.textContent = '配置过长，请减少规则或缩短节点订阅地址。';
           return;
         }
-        if (!result.ok) throw new Error();
+        if (!result.ok) { status.textContent = await result.text(); return; }
         const { url } = await result.json();
         field.value = url;
         copy.disabled = false;
@@ -778,10 +789,12 @@ ${ruleLines.join(',\n')}
       }
     }
 
-    function downloadCode() {
+    async function downloadCode() {
       const filename = state.mode === 'yaml' ? 'ai-route-subconvert.yaml' : 'ai-route-subconvert-override.js';
       const mime = state.mode === 'yaml' ? 'text/yaml;charset=utf-8' : 'application/javascript;charset=utf-8';
-      const blob = new Blob([currentOutput], { type: mime });
+      let text;
+      try { text = await exportText(); } catch (err) { alert(err.message); return; }
+      const blob = new Blob([text], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

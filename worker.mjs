@@ -1,3 +1,15 @@
+import { convert } from './convert.mjs';
+
+async function render(text) {
+  try {
+    return new Response(await convert(text), { headers: { ...privateHeaders, 'Content-Type': 'application/yaml; charset=utf-8' } });
+  } catch (err) {
+    // 只返回公开的错误信息，避免订阅地址或节点凭据进入响应。
+    const reason = /^(公共后端|节点过滤|未取得|节点列表超过|转换结果含|分流模板)/.test(err.message) ? err.message : '上游连接失败或订阅格式不受支持。';
+    return fail(reason, 502);
+  }
+}
+
 const maxYaml = 24 * 1024;
 const maxToken = 6000;
 const shortId = /^[0-9a-f]{48}$/;
@@ -53,6 +65,13 @@ async function createSub(request, env) {
   if (!/^proxy-providers:/m.test(yaml) || !/^proxy-groups:/m.test(yaml) || !/^rules:/m.test(yaml)) {
     return fail('Expected a Mihomo YAML configuration.', 400);
   }
+  const path = new URL(request.url).pathname;
+  const inline = path === '/api/convert' || path === '/api/inline';
+  if (inline) {
+    const result = await render(yaml);
+    if (!result.ok || path === '/api/convert') return result;
+  }
+  const version = inline ? 'v3' : 'v2';
   const stream = new Blob([body]).stream().pipeThrough(new CompressionStream('gzip'));
   const compressed = await new Response(stream).arrayBuffer();
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -65,11 +84,11 @@ async function createSub(request, env) {
     byte.toString(16).padStart(2, '0')
   )).join('');
   try {
-    await env.SUBSCRIPTIONS.put('v2:' + id, bytes.buffer);
+    await env.SUBSCRIPTIONS.put(version + ':' + id, bytes.buffer);
   } catch {
     return fail('Subscription storage is temporarily unavailable.', 503);
   }
-  const url = new URL('/sub/v2/' + id, request.url);
+  const url = new URL('/sub/' + version + '/' + id, request.url);
   return Response.json({ url: url.href }, { status: 201, headers: privateHeaders });
 }
 
@@ -79,12 +98,13 @@ async function getSub(request, env) {
   const path = new URL(request.url).pathname;
   const id = path.slice('/sub/v1/'.length);
   let bytes;
-  if (path.startsWith('/sub/v2/')) {
+  const inline = path.startsWith('/sub/v3/');
+  if (inline || path.startsWith('/sub/v2/')) {
     if (!shortId.test(id)) return fail('Not found.', 404);
     if (!env.SUBSCRIPTIONS) return fail('Subscription storage is unavailable.', 503);
     let encrypted;
     try {
-      encrypted = await env.SUBSCRIPTIONS.get('v2:' + id, 'arrayBuffer');
+      encrypted = await env.SUBSCRIPTIONS.get((inline ? 'v3:' : 'v2:') + id, 'arrayBuffer');
     } catch {
       return fail('Subscription storage is temporarily unavailable.', 503);
     }
@@ -107,7 +127,13 @@ async function getSub(request, env) {
       { name: 'AES-GCM', iv: bytes.subarray(0, 12), additionalData: tokenContext }, key, bytes.subarray(12),
     );
     const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return new Response(stream, {
+    let output = stream;
+    if (inline) {
+      const rendered = await render(await new Response(stream).text());
+      if (!rendered.ok) return rendered;
+      output = rendered.body;
+    }
+    return new Response(output, {
       headers: {
         ...privateHeaders,
         'Content-Type': 'application/yaml; charset=utf-8',
@@ -162,8 +188,8 @@ async function config(request, env) {
 export default {
   fetch(request, env) {
     const path = new URL(request.url).pathname;
-    if (path === '/api/subscriptions') return createSub(request, env);
-    if (path.startsWith('/sub/v1/') || path.startsWith('/sub/v2/')) return getSub(request, env);
+    if (['/api/inline','/api/convert','/api/subscriptions'].includes(path)) return createSub(request, env);
+    if (path.startsWith('/sub/v1/') || path.startsWith('/sub/v2/') || path.startsWith('/sub/v3/')) return getSub(request, env);
     if (path === '/api/config') {
       if (request.method !== 'GET') {
         return new Response('Method not allowed.', { status: 405, headers: { Allow: 'GET' } });
