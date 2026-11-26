@@ -276,6 +276,149 @@
       { id: 'category-ai-chat-!cn', label: '海外 AI 兜底', target: '✨ Other AI' },
     ];
 
+    // 常用分类直接引用规则仓库中的现有规则，勾选后同时生成来源、策略组和规则。
+    const EXTRA_SERVICES = [
+      {
+            "id": "netflix",
+            "label": "Netflix (netflix)",
+            "target": "🎬 Netflix",
+            "keys": [
+                  "netflix"
+            ],
+            "direct": false
+      },
+      {
+            "id": "disney",
+            "label": "Disney+ (disney)",
+            "target": "🏰 Disney+",
+            "keys": [
+                  "disney"
+            ],
+            "direct": false
+      },
+      {
+            "id": "hbo",
+            "label": "HBO / Max (hbo)",
+            "target": "🎞️ HBO / Max",
+            "keys": [
+                  "hbo"
+            ],
+            "direct": false
+      },
+      {
+            "id": "primevideo",
+            "label": "Prime Video (primevideo)",
+            "target": "📽️ Prime Video",
+            "keys": [
+                  "primevideo"
+            ],
+            "direct": false
+      },
+      {
+            "id": "spotify",
+            "label": "Spotify (spotify)",
+            "target": "🎵 Spotify",
+            "keys": [
+                  "spotify"
+            ],
+            "direct": false
+      },
+      {
+            "id": "tiktok",
+            "label": "TikTok (tiktok)",
+            "target": "🎶 TikTok",
+            "keys": [
+                  "tiktok"
+            ],
+            "direct": false
+      },
+      {
+            "id": "twitter",
+            "label": "X / Twitter (twitter)",
+            "target": "🐦 X / Twitter",
+            "keys": [
+                  "twitter"
+            ],
+            "direct": false
+      },
+      {
+            "id": "meta",
+            "label": "Facebook / Instagram (facebook/instagram)",
+            "target": "📱 Facebook / Instagram",
+            "keys": [
+                  "facebook",
+                  "instagram"
+            ],
+            "direct": false
+      },
+      {
+            "id": "discord",
+            "label": "Discord (discord)",
+            "target": "💬 Discord",
+            "keys": [
+                  "discord"
+            ],
+            "direct": false
+      },
+      {
+            "id": "reddit",
+            "label": "Reddit (reddit)",
+            "target": "👽 Reddit",
+            "keys": [
+                  "reddit"
+            ],
+            "direct": false
+      },
+      {
+            "id": "games",
+            "label": "游戏平台 (steam/epicgames/playstation/xbox)",
+            "target": "🎮 游戏平台",
+            "keys": [
+                  "steam",
+                  "epicgames",
+                  "playstation",
+                  "xbox"
+            ],
+            "direct": false
+      },
+      {
+            "id": "bilibili",
+            "label": "Bilibili (bilibili)",
+            "target": "📺 Bilibili",
+            "keys": [
+                  "bilibili"
+            ],
+            "direct": true
+      },
+      {
+            "id": "bahamut",
+            "label": "巴哈姆特 (bahamut)",
+            "target": "📺 巴哈姆特",
+            "keys": [
+                  "bahamut"
+            ],
+            "direct": false
+      },
+      {
+            "id": "paypal",
+            "label": "PayPal (paypal)",
+            "target": "💳 PayPal",
+            "keys": [
+                  "paypal"
+            ],
+            "direct": true
+      },
+      {
+            "id": "zoom",
+            "label": "Zoom (zoom)",
+            "target": "📹 Zoom",
+            "keys": [
+                  "zoom"
+            ],
+            "direct": false
+      }
+];
+
     const SERVICE_ITEMS = [
       { id: 'ads', label: '广告拦截 (category-ads-all)' },
       { id: 'youtube', label: 'YouTube (youtube)' },
@@ -284,6 +427,7 @@
       { id: 'microsoft', label: 'Microsoft (microsoft/onedrive)' },
       { id: 'apple', label: 'Apple (apple/icloud)' },
       { id: 'telegram', label: 'Telegram (+ telegram-ip)' },
+      ...EXTRA_SERVICES,
     ];
 
     const PROVIDER_DEFS = {
@@ -314,6 +458,13 @@
       'cn-ip': { behavior: 'ipcidr', path: 'geo/geoip/cn.mrs' },
       'geolocation-!cn': { behavior: 'domain', path: 'geo/geosite/geolocation-!cn.mrs' },
     };
+
+    // 新分类均为域名规则，使用与现有分类相同的 .mrs 地址和同步周期。
+    for (const service of EXTRA_SERVICES) {
+      for (const key of service.keys) {
+        PROVIDER_DEFS[key] = { behavior: 'domain', path: 'geo/geosite/' + key + '.mrs' };
+      }
+    }
 
     // =========================================================================
     // Application State
@@ -472,6 +623,10 @@
       if (state.services.apple) providers.push('apple', 'icloud');
       if (state.services.telegram) providers.push('telegram', 'telegram-ip');
 
+      // 仅把勾选的新增分类加入规则来源，避免无用下载。
+      const services = EXTRA_SERVICES.filter(service => state.services[service.id]);
+      for (const service of services) providers.push(...service.keys);
+
       // Base CN / Non-CN
       providers.push('geolocation-cn', 'cn', 'cn-ip', 'geolocation-!cn');
 
@@ -519,6 +674,17 @@
         groups.push(`  - name: ✈️ Telegram\n    type: select\n    proxies:\n      - 🚀 节点选择\n    use:\n      - AirportSub`);
       }
 
+      // 常用服务可独立选节点，国内服务和支付服务把直连作为默认选项。
+      for (const service of services) {
+        const options = service.direct ? ['DIRECT', '🚀 节点选择'] : ['🚀 节点选择', 'DIRECT'];
+        groups.push(`  - name: ${service.target}
+    type: select
+    proxies:
+${options.map(name => '      - ' + name).join('\n')}
+    use:
+      - AirportSub`);
+      }
+
       groups.push(
 `  - name: 🐟 漏网之鱼
     type: select
@@ -553,6 +719,10 @@
 
       rules.push('');
       rules.push('  # 4. 常用应用服务');
+      // 新分类排在国内外兜底规则之前，保证选中的服务策略生效。
+      for (const service of services) {
+        for (const key of service.keys) rules.push('  - RULE-SET,' + key + ',' + service.target);
+      }
       if (state.services.youtube) rules.push('  - RULE-SET,youtube,📺 YouTube');
       if (state.services.google) rules.push('  - RULE-SET,google,🔍 Google');
       if (state.services.devtools) {
