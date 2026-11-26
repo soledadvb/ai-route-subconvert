@@ -685,6 +685,24 @@ ${options.map(name => '      - ' + name).join('\n')}
       - AirportSub`);
       }
 
+      // 基础策略组保留原规则的默认出口，并允许在客户端调整。
+      if (state.services.ads) {
+        groups.push(`  - name: 🛑 广告拦截
+    type: select
+    proxies:
+      - REJECT
+      - DIRECT`);
+      }
+      for (const name of ['🏠 私有网络', '🔒 国内服务', '🌍 非中国']) {
+        const options = name === '🌍 非中国' ? ['🚀 节点选择', 'DIRECT'] : ['DIRECT', '🚀 节点选择'];
+        groups.push(`  - name: ${name}
+    type: select
+    proxies:
+${options.map(option => '      - ' + option).join('\n')}
+    use:
+      - AirportSub`);
+      }
+
       groups.push(
 `  - name: 🐟 漏网之鱼
     type: select
@@ -696,8 +714,8 @@ ${options.map(name => '      - ' + name).join('\n')}
       // 3. Rules (Strict Ordering)
       const rules = [];
       rules.push('  # 1. 局域网与广告拦截');
-      rules.push('  - RULE-SET,private,DIRECT');
-      if (state.services.ads) rules.push('  - RULE-SET,category-ads-all,REJECT');
+      rules.push('  - RULE-SET,private,🏠 私有网络');
+      if (state.services.ads) rules.push('  - RULE-SET,category-ads-all,🛑 广告拦截');
 
       if (state.ai['category-ai-cn']) {
         rules.push('');
@@ -742,16 +760,16 @@ ${options.map(name => '      - ' + name).join('\n')}
 
       rules.push('');
       rules.push('  # 5. 国内/海外域名分流');
-      rules.push('  - RULE-SET,geolocation-cn,DIRECT');
-      rules.push('  - RULE-SET,cn,DIRECT');
-      rules.push('  - RULE-SET,geolocation-!cn,🚀 节点选择');
+      rules.push('  - RULE-SET,geolocation-cn,🔒 国内服务');
+      rules.push('  - RULE-SET,cn,🔒 国内服务');
+      rules.push('  - RULE-SET,geolocation-!cn,🌍 非中国');
 
       rules.push('');
       rules.push('  # 6. IP 规则置底 (启用 no-resolve)');
-      rules.push('  - RULE-SET,private-ip,DIRECT,no-resolve');
+      rules.push('  - RULE-SET,private-ip,🏠 私有网络,no-resolve');
       if (state.services.telegram) rules.push('  - RULE-SET,telegram-ip,✈️ Telegram,no-resolve');
       if (state.services.google) rules.push('  - RULE-SET,google-ip,🔍 Google,no-resolve');
-      rules.push('  - RULE-SET,cn-ip,DIRECT,no-resolve');
+      rules.push('  - RULE-SET,cn-ip,🔒 国内服务,no-resolve');
 
       rules.push('');
       rules.push('  # 7. 最终兜底');
