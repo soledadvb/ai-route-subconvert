@@ -56,23 +56,22 @@
       </div>
 
       <!-- Output Mode Tabs -->
-      <div class="flex items-center p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
-        <button
-          id="tab-yaml"
-          type="button"
-          onclick="setMode('yaml')"
-          class="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+      <div class="flex flex-wrap items-center gap-2 p-1 bg-zinc-900 border border-zinc-800 rounded-xl">
+        <select
+          id="client-select"
+          onchange="setMode(this.value)"
+          aria-label="输出格式"
+          class="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100"
         >
-          完整 Mihomo YAML
-        </button>
-        <button
-          id="tab-js"
-          type="button"
-          onclick="setMode('js')"
-          class="px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all"
-        >
-          Clash Verge Rev 覆写脚本
-        </button>
+          <option value="mihomo">Mihomo YAML</option>
+          <option value="surge">Surge</option>
+          <option value="loon">Loon</option>
+          <option value="quanx">Quantumult X</option>
+          <option value="shadowrocket">Shadowrocket</option>
+          <option value="singbox">sing-box</option>
+          <option value="stash">Stash</option>
+          <option value="js">Clash Verge Rev 覆写脚本</option>
+        </select>
       </div>
     </div>
   </header>
@@ -181,7 +180,7 @@
       <div id="common-services-card" class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-white">常用服务与基础规则</h2>
-          <span class="text-[11px] text-zinc-500">YAML 模式生效</span>
+          <span class="text-[11px] text-zinc-500">所有输出格式自动适配</span>
         </div>
 
         <div id="common-services-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -466,11 +465,23 @@
       }
     }
 
+    // 各客户端共用同一份分流选项，下载文件名和 MIME 类型在这里集中维护。
+    const OUTPUTS = {
+      mihomo: { file: 'ai-route-subconvert.yaml', type: 'yaml' },
+      surge: { file: 'ai-route-subconvert-surge.conf', type: 'text' },
+      loon: { file: 'ai-route-subconvert-loon.conf', type: 'text' },
+      quanx: { file: 'ai-route-subconvert-quanx.conf', type: 'text' },
+      shadowrocket: { file: 'ai-route-subconvert-shadowrocket.conf', type: 'text' },
+      singbox: { file: 'ai-route-subconvert-singbox.json', type: 'json' },
+      stash: { file: 'ai-route-subconvert-stash.yaml', type: 'yaml' },
+      js: { file: 'ai-route-subconvert-override.js', type: 'js' },
+    };
+
     // =========================================================================
     // Application State
     // =========================================================================
     const state = {
-      mode: 'yaml', // 'yaml' | 'js'
+      mode: 'mihomo',
       subUrl: '',
       excludeHk: true,
       cdn: 'github',
@@ -547,29 +558,20 @@
     }
 
     function setMode(mode) {
+      if (mode === 'yaml') mode = 'mihomo';
+      if (!OUTPUTS[mode]) mode = 'mihomo';
       state.mode = mode;
-      document.getElementById('btn-link').classList.toggle('hidden', mode !== 'yaml');
+      document.getElementById('client-select').value = mode;
+      document.getElementById('btn-link').classList.toggle('hidden', mode === 'js');
       document.getElementById('link-panel').classList.add('hidden');
-      const tabYaml = document.getElementById('tab-yaml');
-      const tabJs = document.getElementById('tab-js');
       const filename = document.getElementById('preview-filename');
       const subUrlGroup = document.getElementById('sub-url-group');
       const commonCard = document.getElementById('common-services-card');
-      document.getElementById('backend-group').classList.toggle('hidden', mode !== 'yaml');
+      document.getElementById('backend-group').classList.toggle('hidden', mode === 'js');
+      filename.textContent = OUTPUTS[mode].file;
+      subUrlGroup.classList.toggle('opacity-50', mode === 'js');
+      commonCard.classList.toggle('opacity-50', mode === 'js');
 
-      if (mode === 'yaml') {
-        tabYaml.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm';
-        tabJs.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-zinc-200';
-        filename.textContent = 'ai-route-subconvert.yaml';
-        subUrlGroup.classList.remove('opacity-50');
-        commonCard.classList.remove('opacity-50');
-      } else {
-        tabJs.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm';
-        tabYaml.className = 'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all text-zinc-400 hover:text-zinc-200';
-        filename.textContent = 'ai-route-subconvert-override.js';
-        subUrlGroup.classList.add('opacity-50');
-        commonCard.classList.add('opacity-50');
-      }
       updatePreview();
     }
 
@@ -894,7 +896,21 @@ ${ruleLines.join(',\n')}
     }
 
     function updatePreview() {
-      currentOutput = state.mode === 'yaml' ? generateYaml() : generateJs();
+      if (state.mode === 'js') {
+        currentOutput = generateJs();
+      } else if (state.mode === 'mihomo') {
+        currentOutput = generateYaml();
+      } else {
+        const output = OUTPUTS[state.mode];
+        currentOutput = [
+          '# ' + output.file,
+          '#',
+          '# 客户端格式在复制、下载或生成订阅链接时实时转换。',
+          '# 请先填写节点订阅链接，再点击右上角“复制”或“下载文件”。',
+          '# 远程订阅链接会保存本次 AI 与常用服务选项。',
+          '',
+        ].join('\n');
+      }
       document.getElementById('code-output').textContent = currentOutput;
     }
 
@@ -906,11 +922,15 @@ ${ruleLines.join(',\n')}
     // 请求使用当前后端，短链接会加密保存这次选择。
     function requestBody() {
       return generateYaml() + '\nx-ai-route-backend: ' +
-        JSON.stringify(document.getElementById('backend-select').value) + '\n';
+        JSON.stringify(document.getElementById('backend-select').value) +
+        '\nx-ai-route-target: ' + JSON.stringify(state.mode) +
+        '\nx-ai-route-ai: ' + JSON.stringify(state.ai) +
+        '\nx-ai-route-services: ' + JSON.stringify(state.services) +
+        '\nx-ai-route-exclude-hk: ' + JSON.stringify(state.excludeHk) + '\n';
     }
 
     async function exportText() {
-      if (state.mode !== 'yaml') return currentOutput;
+      if (state.mode === 'js') return currentOutput;
       const result = await fetch('/api/convert', {
         method: 'POST', headers: { 'Content-Type': 'application/yaml' }, body: requestBody(),
       });
@@ -998,8 +1018,14 @@ ${ruleLines.join(',\n')}
     }
 
     async function downloadCode() {
-      const filename = state.mode === 'yaml' ? 'ai-route-subconvert.yaml' : 'ai-route-subconvert-override.js';
-      const mime = state.mode === 'yaml' ? 'text/yaml;charset=utf-8' : 'application/javascript;charset=utf-8';
+      const output = OUTPUTS[state.mode];
+      const filename = output.file;
+      const mime = {
+        yaml: 'text/yaml;charset=utf-8',
+        text: 'text/plain;charset=utf-8',
+        json: 'application/json;charset=utf-8',
+        js: 'application/javascript;charset=utf-8',
+      }[output.type];
       let text;
       try { text = await exportText(); } catch (err) { alert(err.message); return; }
       const blob = new Blob([text], { type: mime });

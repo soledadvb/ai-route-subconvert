@@ -1,6 +1,6 @@
 <h1 align="center">✨ AI Route Subconvert</h1>
 
-<p align="center"><strong>面向 AI 服务分流的 Mihomo 订阅转换工具</strong></p>
+<p align="center"><strong>面向 AI 服务分流的跨客户端订阅转换工具</strong></p>
 
 <p align="center">
   <a href="https://github.com/soledadvb/ai-route-subconvert/stargazers"><img src="https://img.shields.io/github/stars/soledadvb/ai-route-subconvert?style=flat-square&amp;logo=github" alt="GitHub Stars"></a>
@@ -15,15 +15,17 @@
   <a href="https://github.com/soledadvb/ai-route-subconvert/issues">💬 提交问题</a>
 </p>
 
-把节点订阅生成一份带有 AI 和常用服务分流规则的 Mihomo 配置。可以直接复制、下载 YAML，或生成短订阅链接导入 Clash Verge Rev。
+把节点订阅生成带有 AI 和常用服务分流规则的客户端配置。可以直接复制、下载配置，或生成可重复刷新的短订阅链接。
+
+支持 Mihomo、Clash Verge Rev 覆写脚本、Surge 5、Loon、Quantumult X、Shadowrocket、sing-box 和 Stash。非 Mihomo 客户端使用相同选项生成对应格式，AI 分组、香港节点过滤和规则顺序保持不变。
 
 ## 快速开始
 
 1. 打开网页，粘贴 HTTPS 节点订阅或 `ss://`、`vmess://`、`trojan://` 节点链接。
-2. 选择转换后端，按需要勾选 AI 与常用服务分类。规则同步周期按小时填写，默认 24 小时。
-3. 点击 **生成订阅链接**，将短链接作为远程订阅导入 Clash Verge Rev。也可以点击 **复制** 或 **下载文件**，直接获取完整 YAML。
+2. 在右上角选择目标客户端，再选择转换后端并勾选 AI 与常用服务分类。
+3. 点击 **生成订阅链接**，将短链接导入所选客户端。也可以点击 **复制** 或 **下载文件** 直接取得配置。
 
-远程订阅每次刷新都会向所选后端获取最新节点，并应用生成链接时选择的分流规则。修改勾选项或切换后端后，重新生成链接即可。
+远程订阅每次刷新都会重新获取最新节点，并应用生成链接时保存的客户端类型和分流选项。修改客户端、选项或切换后端后，重新生成链接即可。
 
 ## 分流功能
 
@@ -35,7 +37,10 @@
 
 - AI 策略组可排除香港、国内节点，以及流量、剩余、到期和重置等提示项。
 - 规则集使用 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 的 `.mrs` 文件，支持 GitHub、镜像和自定义地址。
-- **覆写脚本** 模式可为 Clash Verge Rev 已有的订阅添加 AI 分流规则。在网页右侧点击 **查看配置预览** 可展开输出。
+- Surge、Loon、Quantumult X、Shadowrocket 和 sing-box 使用外部转换后端支持的对应目标格式，分流规则来自 [blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script) 和 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 的文本列表。
+- Stash 使用 Clash YAML 输出并通过远程 rule provider 引用规则。Shadowrocket 固定使用 `api.v1.mk`，sing-box 固定使用 `subapi.fxxk.dedyn.io`，其余客户端使用页面选择的后端。
+- 转换完成后会检查目标客户端配置是否实际包含所选策略组。后端未应用规则时直接提示更换后端，避免把默认配置误当成成功结果。
+- **覆写脚本** 模式可为 Clash Verge Rev 已有的订阅添加 AI 分流规则。在网页右侧点击 **查看配置预览** 可展开输出；其他客户端在复制、下载或生成链接时实时转换。
 
 ## 订阅地址与转换后端
 

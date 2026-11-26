@@ -1,11 +1,12 @@
-import { convert } from './convert.mjs';
+import { convert, renderIni } from './convert.mjs';
 
-async function render(text) {
+async function render(text, origin) {
   try {
-    return new Response(await convert(text), { headers: { ...privateHeaders, 'Content-Type': 'application/yaml; charset=utf-8' } });
+    const result = await convert(text, undefined, origin);
+    return new Response(result.body, { headers: { ...privateHeaders, 'Content-Type': result.type } });
   } catch (err) {
     // 只返回公开的错误信息，避免订阅地址或节点凭据进入响应。
-    const reason = /^(公共后端|节点过滤|未取得|节点列表超过|转换结果含|分流模板)/.test(err.message) ? err.message : '上游连接失败或订阅格式不受支持。';
+    const reason = /^(公共后端|节点过滤|未取得|节点列表超过|转换结果(?:含|超过)|分流模板|请输入有效|转换后端未应用)/.test(err.message) ? err.message : '上游连接失败或订阅格式不受支持。';
     return fail(reason, 502);
   }
 }
@@ -68,7 +69,7 @@ async function createSub(request, env) {
   const path = new URL(request.url).pathname;
   const inline = path === '/api/convert' || path === '/api/inline';
   if (inline) {
-    const result = await render(yaml);
+    const result = await render(yaml, new URL(request.url).origin);
     if (!result.ok || path === '/api/convert') return result;
   }
   const version = inline ? 'v3' : 'v2';
@@ -128,23 +129,34 @@ async function getSub(request, env) {
     );
     const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
     let output = stream;
+    let contentType = 'application/yaml; charset=utf-8';
     if (inline) {
-      const rendered = await render(await new Response(stream).text());
+      const rendered = await render(await new Response(stream).text(), new URL(request.url).origin);
       if (!rendered.ok) return rendered;
       output = rendered.body;
+      contentType = rendered.headers.get('Content-Type') || contentType;
     }
+    const extension = contentType.includes('json') ? 'json' : contentType.includes('yaml') ? 'yaml' : 'conf';
     return new Response(output, {
       headers: {
         ...privateHeaders,
-        'Content-Type': 'application/yaml; charset=utf-8',
-        // Clash Verge 优先解析 filename*，旧版客户端可读取不带引号的备用名称。
-        'Content-Disposition': "attachment; filename=AI-Route-Subconvert; filename*=UTF-8''AI%20Route%20Subconvert",
+        'Content-Type': contentType,
+        // 扩展名与客户端格式一致，便于客户端按配置类型识别下载内容。
+        'Content-Disposition': `attachment; filename=AI-Route-Subconvert.${extension}; filename*=UTF-8''AI%20Route%20Subconvert.${extension}`,
         'Profile-Title': 'AI Route Subconvert',
       },
     });
   } catch {
     return fail('Not found.', 404);
   }
+}
+
+// 公共转换后端只读取分类和规则，不接收用户订阅，避免规则模板泄露节点凭据。
+function rules(request) {
+  if (request.method !== 'GET') return fail('Method not allowed.', 405, { Allow: 'GET' });
+  return new Response(renderIni(new URL(request.url).searchParams), {
+    headers: { ...privateHeaders, 'Content-Type': 'text/plain; charset=utf-8' },
+  });
 }
 
 async function config(request, env) {
@@ -190,6 +202,7 @@ export default {
     const path = new URL(request.url).pathname;
     if (['/api/inline','/api/convert','/api/subscriptions'].includes(path)) return createSub(request, env);
     if (path.startsWith('/sub/v1/') || path.startsWith('/sub/v2/') || path.startsWith('/sub/v3/')) return getSub(request, env);
+    if (path === '/api/rules.ini') return rules(request);
     if (path === '/api/config') {
       if (request.method !== 'GET') {
         return new Response('Method not allowed.', { status: 405, headers: { Allow: 'GET' } });
