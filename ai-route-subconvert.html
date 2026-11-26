@@ -111,21 +111,17 @@
 
         <div id="claude-profile" class="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80">
           <div class="flex items-center justify-between gap-3">
-            <div>
-              <div class="text-xs sm:text-sm font-medium text-zinc-200">分流模式</div>
-              <div id="claude-mode-label" class="text-[11px] text-zinc-500">普通模式</div>
-            </div>
-            <button
-              id="claude-mode-switch"
-              type="button"
-              role="switch"
-              aria-checked="false"
-              aria-label="切换普通模式和兜底模式"
-              onclick="toggleClaudeMode()"
-              class="relative inline-flex h-6 w-11 shrink-0 rounded-full bg-zinc-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            <label for="claude-mode-select" class="text-xs sm:text-sm font-medium text-zinc-200">
+              分流模式
+            </label>
+            <select
+              id="claude-mode-select"
+              onchange="setClaudeMode(this.value === 'fallback')"
+              class="min-w-32 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             >
-              <span id="claude-mode-knob" class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform"></span>
-            </button>
+              <option value="normal">普通模式</option>
+              <option value="fallback">兜底模式</option>
+            </select>
           </div>
           <div class="mt-2 space-y-1 text-[11px] text-zinc-400">
             <p><span class="font-medium text-zinc-300">普通模式</span>：沿用下方 AI 与常用服务分流。</p>
@@ -926,19 +922,14 @@ ${ruleLines.join(',\n')}
       return state.claudeOnly && ['mihomo', 'js'].includes(state.mode);
     }
 
-    function renderClaudeMode() {
-      const enabled = state.claudeOnly;
-      const control = document.getElementById('claude-mode-switch');
-      control.setAttribute('aria-checked', String(enabled));
-      control.className = `relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40 ${enabled ? 'bg-indigo-500' : 'bg-zinc-700'}`;
-      document.getElementById('claude-mode-knob').className = `absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`;
-      document.getElementById('claude-mode-label').textContent = enabled ? '兜底模式' : '普通模式';
+    function syncClaudeMode() {
+      document.getElementById('claude-mode-select').value = state.claudeOnly ? 'fallback' : 'normal';
     }
 
-    function toggleClaudeMode() {
-      state.claudeOnly = !state.claudeOnly;
+    function setClaudeMode(useFallback) {
+      state.claudeOnly = useFallback;
       document.getElementById('link-panel').classList.add('hidden');
-      renderClaudeMode();
+      syncClaudeMode();
       updatePreview();
     }
 
@@ -1028,7 +1019,7 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
 
     function updatePreview() {
       const claude = isClaude();
-      renderClaudeMode();
+      syncClaudeMode();
       document.getElementById('claude-profile').classList.toggle('hidden', !['mihomo', 'js'].includes(state.mode));
       document.getElementById('node-filter').classList.toggle('hidden', claude);
       document.getElementById('ai-heading').parentElement.parentElement.classList.toggle('hidden', claude);
