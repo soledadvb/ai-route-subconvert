@@ -4,7 +4,7 @@ import { parse, stringify } from 'yaml';
 const endpoint = 'https://subapi.fxxk.dedyn.io/sub';
 const excluded = /港|HK|Hong|中国|CN|官网|到期|流量/i;
 
-export async function convert(text, send = fetch) {
+export async function convert(text, send = (url, init) => fetch(url, init)) {
   const config = parse(text, { maxAliasCount: 0 });
   const source = config?.['proxy-providers']?.AirportSub?.url;
   if (typeof source !== 'string' || !Array.isArray(config['proxy-groups']) ||
@@ -18,7 +18,7 @@ export async function convert(text, send = fetch) {
   const timer = setTimeout(() => controller.abort(), 20000);
   let response;
   try {
-    response = await send(api.href, { redirect: 'error', signal: controller.signal,
+    response = await send(api.href, { redirect: 'manual', signal: controller.signal,
       headers: { 'User-Agent': 'AI-Route-Subconvert/1.0' } });
   } catch {
     throw Error('公共后端连接失败或超时。');
