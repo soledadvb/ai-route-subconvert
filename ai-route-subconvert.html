@@ -916,24 +916,21 @@ ${ruleLines.join(',\n')}
       const privateNet = '🏠 私有网络';
       const prefix = getPrefix();
       const interval = Math.max(300, Number(state.interval) || 86400);
-      const providers = Object.fromEntries(['anthropic', 'private', 'private-ip', 'category-ads-all', 'geolocation-cn', 'cn'].map(key => [
-        `claude-${key}`, {
+      const providers = Object.fromEntries(['private', 'private-ip', 'geolocation-cn', 'cn', 'category-ads-all'].map(key => [
+        key, {
           type: 'http', behavior: PROVIDER_DEFS[key].behavior, format: 'mrs',
           url: prefix + PROVIDER_DEFS[key].path,
-          path: `./ruleset/claude-${key}.mrs`, interval,
+          path: `./ruleset/${key}.mrs`, interval,
         },
       ]));
-      // Claude 优先走代理。私网 IP 只匹配现有目标地址，避免解析域名后误判为私网。
+      // 优先匹配私有网络和国内白名单，未命中的流量先检查广告规则，再由代理组兜底。
+      // 私网 IP 规则只检查已有目标地址，避免把解析结果当成直连依据。
       const rules = [
-        `DOMAIN-SUFFIX,claude.ai,${group}`,
-        `DOMAIN-SUFFIX,claude.com,${group}`,
-        `DOMAIN-SUFFIX,anthropic.com,${group}`,
-        `RULE-SET,claude-anthropic,${group}`,
-        `RULE-SET,claude-private,${privateNet}`,
-        `RULE-SET,claude-private-ip,${privateNet},no-resolve`,
-        `RULE-SET,claude-category-ads-all,${ads}`,
-        'RULE-SET,claude-geolocation-cn,DIRECT',
-        'RULE-SET,claude-cn,DIRECT',
+        `RULE-SET,private,${privateNet}`,
+        `RULE-SET,private-ip,${privateNet},no-resolve`,
+        'RULE-SET,geolocation-cn,DIRECT',
+        'RULE-SET,cn,DIRECT',
+        `RULE-SET,category-ads-all,${ads}`,
         `MATCH,${group}`,
       ];
       // 候选项的第一项是默认策略。广告和私网选项独立于外网兜底组。
