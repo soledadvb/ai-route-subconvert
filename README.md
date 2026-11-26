@@ -1,8 +1,21 @@
-# AI Route Subconvert
+<h1 align="center">✨ AI Route Subconvert</h1>
+
+<p align="center"><strong>面向 AI 服务分流的 Mihomo 订阅转换工具</strong></p>
+
+<p align="center">
+  <a href="https://github.com/soledadvb/ai-route-subconvert/stargazers"><img src="https://img.shields.io/github/stars/soledadvb/ai-route-subconvert?style=flat-square&amp;logo=github" alt="GitHub Stars"></a>
+  <a href="https://github.com/soledadvb/ai-route-subconvert/releases/latest"><img src="https://img.shields.io/github/v/release/soledadvb/ai-route-subconvert?style=flat-square" alt="最新版本"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/soledadvb/ai-route-subconvert?style=flat-square" alt="MIT 许可证"></a>
+</p>
+
+<p align="center">
+  <a href="https://ai-route-subconvert.pages.dev/">🌐 在线使用</a> ·
+  <a href="#快速开始">🚀 快速开始</a> ·
+  <a href="#自行部署">☁️ Cloudflare Pages 部署</a> ·
+  <a href="https://github.com/soledadvb/ai-route-subconvert/issues">💬 提交问题</a>
+</p>
 
 把节点订阅生成一份带有 AI 和常用服务分流规则的 Mihomo 配置。可以直接复制、下载 YAML，或生成短订阅链接导入 Clash Verge Rev。
-
-**[在线使用](https://ai-route-subconvert.pages.dev/)** · [提交问题](https://github.com/soledadvb/ai-route-subconvert/issues)
 
 ## 快速开始
 
