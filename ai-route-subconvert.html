@@ -113,7 +113,7 @@
           <input id="claude-only" type="checkbox" class="mt-0.5 w-4 h-4" />
           <span class="text-xs text-zinc-200">
             <strong class="block">Claude 专用模式</strong>
-            仅淘宝、天猫、京东、铁路 12306 的域名直连，其余流量走代理。适用于 Mihomo 和 Clash Verge Rev。
+            Claude 优先走代理，国内域名按规则集直连，其余流量走代理。适用于 Mihomo 和 Clash Verge Rev。
           </span>
         </label>
 
@@ -133,7 +133,7 @@
 
       <!-- 2. GitHub Rule Sync Source -->
       <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-4">
-        <h2 id="sync-heading" class="text-sm font-semibold text-white">GitHub 规则同步源</h2>
+        <h2 class="text-sm font-semibold text-white">GitHub 规则同步源</h2>
 
         <div class="space-y-1.5">
           <label for="cdn-select" class="block text-xs font-medium text-zinc-300">镜像前缀</label>
@@ -911,10 +911,26 @@ ${ruleLines.join(',\n')}
     }
 
     function generateClaude(script = false) {
-      // 白名单只包含明确指定的国内平台域名，IP 请求和其他域名统一交给代理组。
       const group = 'ClaudeProxy';
-      const domains = ['taobao.com', 'tmall.com', 'jd.com', '12306.cn'];
-      const rules = domains.map(domain => `DOMAIN-SUFFIX,${domain},DIRECT`).concat(`MATCH,${group}`);
+      const prefix = getPrefix();
+      const interval = Math.max(300, Number(state.interval) || 86400);
+      const providers = Object.fromEntries(['anthropic', 'geolocation-cn', 'cn'].map(key => [
+        `claude-${key}`, {
+          type: 'http', behavior: 'domain', format: 'mrs',
+          url: prefix + PROVIDER_DEFS[key].path,
+          path: `./ruleset/claude-${key}.mrs`, interval,
+        },
+      ]));
+      // Claude 域名优先匹配，避免国内规则集误覆盖。无域名可匹配的 IP 请求也使用代理兜底。
+      const rules = [
+        `DOMAIN-SUFFIX,claude.ai,${group}`,
+        `DOMAIN-SUFFIX,claude.com,${group}`,
+        `DOMAIN-SUFFIX,anthropic.com,${group}`,
+        `RULE-SET,claude-anthropic,${group}`,
+        'RULE-SET,claude-geolocation-cn,DIRECT',
+        'RULE-SET,claude-cn,DIRECT',
+        `MATCH,${group}`,
+      ];
       // 普通 DNS 查询走代理，节点服务器域名可独立解析，避免代理尚未建立时形成循环。
       const dns = {
         enable: true, ipv6: false, 'enhanced-mode': 'fake-ip', 'fake-ip-range': '198.18.0.1/16',
@@ -932,6 +948,7 @@ ${ruleLines.join(',\n')}
   config.mode = 'rule';
   config.dns = ${JSON.stringify(dns, null, 2)};
   config['proxy-groups'] = [{ name: '${group}', type: 'select', proxies: [...nodes.map(node => node.name), 'REJECT'] }];
+  config['rule-providers'] = ${JSON.stringify(providers, null, 2)};
   config.rules = ${JSON.stringify(rules, null, 2)};
   return config;
 }
@@ -955,6 +972,8 @@ proxy-groups:
     proxies: [REJECT]
     use: [AirportSub]
     filter: ${JSON.stringify(`(?i)^(?!.*(${EXCLUDE_REGEX})).*$`)}
+rule-providers:
+${Object.entries(providers).map(([key, provider]) => `  ${key}: ${JSON.stringify(provider)}`).join('\n')}
 rules:
 ${rules.map(rule => '  - ' + rule).join('\n')}
 `;
@@ -964,7 +983,6 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
       const claude = isClaude();
       document.getElementById('claude-profile').classList.toggle('hidden', !['mihomo', 'js'].includes(state.mode));
       document.getElementById('node-filter').classList.toggle('hidden', claude);
-      document.getElementById('sync-heading').parentElement.classList.toggle('hidden', claude);
       document.getElementById('ai-heading').parentElement.parentElement.classList.toggle('hidden', claude);
       document.getElementById('common-services-card').classList.toggle('hidden', claude);
       if (state.mode === 'js') {

@@ -29,7 +29,7 @@
 
 ## 分流功能
 
-**Claude 专用模式**适用于 Mihomo YAML、Mihomo 远程订阅和 Clash Verge Rev 覆写脚本。启用后，只有 `taobao.com`、`tmall.com`、`jd.com`、`12306.cn` 及其子域名直连，其余流量交给 `ClaudeProxy`。覆写脚本会替换原有路由规则，并使用配置中内联的节点。没有符合条件的节点时，代理组使用 `REJECT`。节点名称过滤仅供初筛，出口 IP 取决于实际选择的代理节点。
+**Claude 专用模式**适用于 Mihomo YAML、Mihomo 远程订阅和 Clash Verge Rev 覆写脚本。Claude 和 Anthropic 域名优先交给 `ClaudeProxy`，国内域名按 MetaCubeX 的 `geolocation-cn` 和 `cn` 规则集直连，其余流量走代理。规则集使用页面所选的镜像和同步周期。覆写脚本会替换原有路由规则，并使用配置中内联的节点。没有符合条件的节点时，代理组使用 `REJECT`。节点名称过滤仅供初筛，出口 IP 取决于实际选择的代理节点。已生成的短链接保存原有配置，重新生成后即可使用新版规则。
 
 | 分类 | 支持范围 |
 | --- | --- |
