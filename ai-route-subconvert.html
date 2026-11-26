@@ -125,7 +125,7 @@
           </div>
           <div class="mt-2 space-y-1 text-[11px] text-zinc-400">
             <p><span class="font-medium text-zinc-300">普通模式</span>：沿用下方 AI 与常用服务分流。</p>
-            <p><span class="font-medium text-zinc-300">兜底模式</span>：国内直连白名单和私有网络直连，广告默认拦截，其余流量全部走「非国内」代理组。</p>
+            <p><span class="font-medium text-zinc-300">兜底模式</span>：国内直连白名单和私有网络直连，广告默认拦截，其余流量全部走「非国内」代理组。所有客户端格式均支持。</p>
           </div>
         </div>
 
@@ -504,7 +504,7 @@
       mode: 'mihomo',
       subUrl: '',
       excludeHk: true,
-      claudeOnly: false,
+      fallbackMode: false,
       cdn: 'github',
       customPrefix: '',
       interval: 86400,
@@ -623,7 +623,7 @@
     }
 
     function generateYaml() {
-      if (isClaude()) return generateClaude();
+      if (isFallback()) return generateFallback();
       const prefix = getPrefix();
       const interval = Math.max(300, Number(state.interval) || 86400);
       const subUrl = (state.subUrl || 'https://example.com/sub').trim();
@@ -842,7 +842,7 @@ ${rules.join('\n')}
     }
 
     function generateJs() {
-      if (isClaude()) return generateClaude(true);
+      if (isFallback()) return generateFallback(true);
       const prefix = getPrefix();
       const interval = Math.max(300, Number(state.interval) || 86400);
 
@@ -918,22 +918,22 @@ ${ruleLines.join(',\n')}
 `;
     }
 
-    function isClaude() {
-      return state.claudeOnly && ['mihomo', 'js'].includes(state.mode);
+    function isFallback() {
+      return state.fallbackMode;
     }
 
     function syncClaudeMode() {
-      document.getElementById('claude-mode-select').value = state.claudeOnly ? 'fallback' : 'normal';
+      document.getElementById('claude-mode-select').value = state.fallbackMode ? 'fallback' : 'normal';
     }
 
     function setClaudeMode(useFallback) {
-      state.claudeOnly = useFallback;
+      state.fallbackMode = useFallback;
       document.getElementById('link-panel').classList.add('hidden');
       syncClaudeMode();
       updatePreview();
     }
 
-    function generateClaude(script = false) {
+    function generateFallback(script = false) {
       const group = '非国内';
       const ads = '🛑 广告拦截';
       const privateNet = '🏠 私有网络';
@@ -1018,12 +1018,12 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
     }
 
     function updatePreview() {
-      const claude = isClaude();
+      const fallback = isFallback();
       syncClaudeMode();
-      document.getElementById('claude-profile').classList.toggle('hidden', !['mihomo', 'js'].includes(state.mode));
-      document.getElementById('node-filter').classList.toggle('hidden', claude);
-      document.getElementById('ai-heading').parentElement.parentElement.classList.toggle('hidden', claude);
-      document.getElementById('common-services-card').classList.toggle('hidden', claude);
+      document.getElementById('claude-profile').classList.remove('hidden');
+      document.getElementById('node-filter').classList.toggle('hidden', fallback);
+      document.getElementById('ai-heading').parentElement.parentElement.classList.toggle('hidden', fallback);
+      document.getElementById('common-services-card').classList.toggle('hidden', fallback);
       if (state.mode === 'js') {
         currentOutput = generateJs();
       } else if (state.mode === 'mihomo') {
@@ -1055,7 +1055,8 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
         '\nx-ai-route-ai: ' + JSON.stringify(state.ai) +
         '\nx-ai-route-services: ' + JSON.stringify(state.services) +
         '\nx-ai-route-exclude-hk: ' + JSON.stringify(state.excludeHk) +
-        '\nx-ai-route-claude: ' + JSON.stringify(isClaude()) + '\n';
+        '\nx-ai-route-claude: ' + JSON.stringify(isFallback()) +
+        '\nx-ai-route-fallback: ' + JSON.stringify(isFallback()) + '\n';
     }
 
     async function exportText() {

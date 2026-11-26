@@ -120,8 +120,28 @@ function ruleList(group, path) {
   return `ruleset=${group},${path.startsWith('https://') ? path : clashLists + path}`;
 }
 
+function renderFallback(groupsOnly) {
+  const groups = [
+    'custom_proxy_group=非国内`select`.*',
+    'custom_proxy_group=🛑 广告拦截`select`[]REJECT`[]DIRECT',
+    'custom_proxy_group=🏠 私有网络`select`[]DIRECT`[]非国内',
+  ];
+  if (groupsOnly) return ['[custom]', 'enable_rule_generator=true', 'overwrite_original_rules=true', 'add_emoji=false', '', ...groups, ''].join('\n');
+
+  const rules = [
+    ruleList('🏠 私有网络', metaLists + 'geosite/private.list'),
+    ruleList('🏠 私有网络', metaLists + 'geoip/private.list'),
+    ruleList('DIRECT', metaLists + 'geosite/geolocation-cn.list'),
+    ruleList('DIRECT', metaLists + 'geosite/cn.list'),
+    ruleList('🛑 广告拦截', serviceLists.ads[0][1]),
+    'ruleset=非国内,[]FINAL',
+  ];
+  return ['[custom]', 'enable_rule_generator=true', 'overwrite_original_rules=true', 'add_emoji=false', '', ...groups, '', ...rules, ''].join('\n');
+}
+
 // 该配置只包含分类和规则，不包含用户的订阅地址或节点凭据，可供公共转换后端读取。
 export function renderIni(params) {
+  if (params.get('fallback') === '1') return renderFallback(params.get('rules') === '0');
   const ai = splitList(params.get('ai'));
   const services = splitList(params.get('svc'));
   const groupsOnly = params.get('rules') === '0';
@@ -192,6 +212,7 @@ function selectedParams(config) {
     ai: ai.join(','),
     svc: services.join(','),
     exclude: config['x-ai-route-exclude-hk'] === false ? '0' : '1',
+    fallback: config['x-ai-route-fallback'] === true || config['x-ai-route-claude'] === true ? '1' : '0',
   });
 }
 
@@ -217,31 +238,39 @@ function addSingboxRules(body, options) {
     rules.push({ rule_set: tag, outbound: group });
   };
 
-  addRule('DIRECT', 'geosite', 'private');
-  addRule('DIRECT', 'geoip', 'private');
-  if (options.services.ads) addRule('REJECT', 'geosite', 'category-ads-all');
-  if (options.ai['category-ai-cn']) addRule('DIRECT', 'geosite', 'category-ai-cn');
+  if (options.fallback) {
+    addRule('🏠 私有网络', 'geosite', 'private');
+    addRule('🏠 私有网络', 'geoip', 'private');
+    addRule('DIRECT', 'geosite', 'geolocation-cn');
+    addRule('DIRECT', 'geosite', 'cn');
+    addRule('🛑 广告拦截', 'geosite', 'category-ads-all');
+  } else {
+    addRule('DIRECT', 'geosite', 'private');
+    addRule('DIRECT', 'geoip', 'private');
+    if (options.services.ads) addRule('REJECT', 'geosite', 'category-ads-all');
+    if (options.ai['category-ai-cn']) addRule('DIRECT', 'geosite', 'category-ai-cn');
 
-  const singboxAiNames = {
-    openai: 'openai',
-    anthropic: 'anthropic',
-    'google-gemini': 'google-gemini',
-    xai: 'xai',
-    perplexity: 'perplexity',
-    'category-ai-chat-!cn': 'category-ai-chat-!cn',
-  };
-  for (const [key, name] of Object.entries(singboxAiNames)) {
-    if (options.ai[key]) addRule(aiGroups[key][0], 'geosite', name);
+    const singboxAiNames = {
+      openai: 'openai',
+      anthropic: 'anthropic',
+      'google-gemini': 'google-gemini',
+      xai: 'xai',
+      perplexity: 'perplexity',
+      'category-ai-chat-!cn': 'category-ai-chat-!cn',
+    };
+    for (const [key, name] of Object.entries(singboxAiNames)) {
+      if (options.ai[key]) addRule(aiGroups[key][0], 'geosite', name);
+    }
+
+    for (const [key, entries] of Object.entries(singboxServiceLists)) {
+      if (key === 'ads' || !options.services[key]) continue;
+      for (const [group, name] of entries) addRule(group, 'geosite', name);
+    }
+
+    addRule('DIRECT', 'geosite', 'cn');
+    addRule('DIRECT', 'geoip', 'cn');
+    addRule('NodeSelect', 'geosite', 'geolocation-!cn');
   }
-
-  for (const [key, entries] of Object.entries(singboxServiceLists)) {
-    if (key === 'ads' || !options.services[key]) continue;
-    for (const [group, name] of entries) addRule(group, 'geosite', name);
-  }
-
-  addRule('DIRECT', 'geosite', 'cn');
-  addRule('DIRECT', 'geoip', 'cn');
-  addRule('NodeSelect', 'geosite', 'geolocation-!cn');
   const current = route.rules || [];
   let offset = 0;
   while (current[offset]?.clash_mode) offset += 1;
@@ -268,11 +297,12 @@ function addSingboxRules(body, options) {
     delete inbound.sniff;
   }
   route.default_domain_resolver = 'dns_direct';
-  route.final = 'Final';
+  route.final = options.fallback ? '非国内' : 'Final';
   return JSON.stringify(config, null, 2);
 }
 
 function expectedGroups(options) {
+  if (options.fallback) return ['非国内', '🛑 广告拦截', '🏠 私有网络'];
   const groups = new Set(['NodeSelect']);
   for (const [key, group] of Object.entries(aiGroups)) {
     if (options.ai[key]) groups.add(group[0]);
@@ -337,8 +367,9 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
   const backend = config['x-ai-route-backend'] || backends[0];
   if (!backends.includes(backend)) throw Error('分流模板中的后端无效。');
   const client = clients[config['x-ai-route-target']] ? config['x-ai-route-target'] : 'mihomo';
-  const claude = client === 'mihomo' && config['x-ai-route-claude'] === true;
+  const fallback = config['x-ai-route-fallback'] === true || config['x-ai-route-claude'] === true;
   const options = {
+    fallback,
     ai: config['x-ai-route-ai'] || {},
     services: config['x-ai-route-services'] || {},
   };
@@ -349,6 +380,7 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
   delete config['x-ai-route-services'];
   delete config['x-ai-route-exclude-hk'];
   delete config['x-ai-route-claude'];
+  delete config['x-ai-route-fallback'];
 
   const api = native?.api || new URL(backend);
   if (!native) api.search = new URLSearchParams({ target: 'clash', list: 'true', url: source }).toString();
@@ -398,7 +430,7 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
     if (!group.use?.includes('AirportSub')) continue;
     const names = nodes.map(node => node.name).filter(name => !group.filter || !excluded.test(name));
     if (!names.length && !group.proxies?.length) throw Error('节点过滤后分组为空，请关闭节点过滤再生成。');
-    if (claude) {
+    if (client === 'mihomo' && fallback) {
       // 专用模式先选实际代理节点。没有符合条件的节点时，保留 REJECT 防止直连。
       const selectable = nodes.filter(node => names.includes(node.name) &&
         !/^(direct|reject(?:-drop)?|pass|dns|compatible|rematch)$/i.test(node.type));
