@@ -29,6 +29,8 @@
 
 ## 分流功能
 
+**Claude 专用模式**适用于 Mihomo YAML、Mihomo 远程订阅和 Clash Verge Rev 覆写脚本。启用后，只有 `taobao.com`、`tmall.com`、`jd.com`、`12306.cn` 及其子域名直连，其余流量交给 `ClaudeProxy`。覆写脚本会替换原有路由规则，并使用配置中内联的节点。没有符合条件的节点时，代理组使用 `REJECT`。节点名称过滤仅供初筛，出口 IP 取决于实际选择的代理节点。
+
 | 分类 | 支持范围 |
 | --- | --- |
 | AI | OpenAI、Claude、Gemini、Grok、Perplexity、其他海外 AI 和国内 AI |

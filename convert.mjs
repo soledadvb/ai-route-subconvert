@@ -337,6 +337,7 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
   const backend = config['x-ai-route-backend'] || backends[0];
   if (!backends.includes(backend)) throw Error('分流模板中的后端无效。');
   const client = clients[config['x-ai-route-target']] ? config['x-ai-route-target'] : 'mihomo';
+  const claude = client === 'mihomo' && config['x-ai-route-claude'] === true;
   const options = {
     ai: config['x-ai-route-ai'] || {},
     services: config['x-ai-route-services'] || {},
@@ -347,6 +348,7 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
   delete config['x-ai-route-ai'];
   delete config['x-ai-route-services'];
   delete config['x-ai-route-exclude-hk'];
+  delete config['x-ai-route-claude'];
 
   const api = native?.api || new URL(backend);
   if (!native) api.search = new URLSearchParams({ target: 'clash', list: 'true', url: source }).toString();
@@ -396,7 +398,14 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
     if (!group.use?.includes('AirportSub')) continue;
     const names = nodes.map(node => node.name).filter(name => !group.filter || !excluded.test(name));
     if (!names.length && !group.proxies?.length) throw Error('节点过滤后分组为空，请关闭节点过滤再生成。');
-    group.proxies = [...new Set([...(group.proxies || []), ...names])];
+    if (claude) {
+      // 专用模式先选实际代理节点。没有符合条件的节点时，保留 REJECT 防止直连。
+      const selectable = nodes.filter(node => names.includes(node.name) &&
+        !/^(direct|reject(?:-drop)?|pass|dns|compatible|rematch)$/i.test(node.type));
+      group.proxies = [...selectable.map(node => node.name), 'REJECT'];
+    } else {
+      group.proxies = [...new Set([...(group.proxies || []), ...names])];
+    }
     delete group.use;
     delete group.filter;
   }

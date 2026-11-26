@@ -109,7 +109,15 @@
           />
         </div>
 
-        <label class="flex items-start gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer hover:border-zinc-700 transition-colors">
+        <label id="claude-profile" class="flex items-start gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer">
+          <input id="claude-only" type="checkbox" class="mt-0.5 w-4 h-4" />
+          <span class="text-xs text-zinc-200">
+            <strong class="block">Claude 专用模式</strong>
+            仅淘宝、天猫、京东、铁路 12306 的域名直连，其余流量走代理。适用于 Mihomo 和 Clash Verge Rev。
+          </span>
+        </label>
+
+        <label id="node-filter" class="flex items-start gap-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 cursor-pointer hover:border-zinc-700 transition-colors">
           <input
             id="exclude-hk"
             type="checkbox"
@@ -125,7 +133,7 @@
 
       <!-- 2. GitHub Rule Sync Source -->
       <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-4">
-        <h2 class="text-sm font-semibold text-white">GitHub 规则同步源</h2>
+        <h2 id="sync-heading" class="text-sm font-semibold text-white">GitHub 规则同步源</h2>
 
         <div class="space-y-1.5">
           <label for="cdn-select" class="block text-xs font-medium text-zinc-300">镜像前缀</label>
@@ -167,7 +175,7 @@
       <!-- 3. Fine-grained AI Rules -->
       <div class="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4 sm:p-5 space-y-3">
         <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-white">精细化 AI 分流规则</h2>
+          <h2 id="ai-heading" class="text-sm font-semibold text-white">精细化 AI 分流规则</h2>
           <span class="text-[11px] font-mono text-zinc-500">按优先级自动排序</span>
         </div>
 
@@ -484,6 +492,7 @@
       mode: 'mihomo',
       subUrl: '',
       excludeHk: true,
+      claudeOnly: false,
       cdn: 'github',
       customPrefix: '',
       interval: 86400,
@@ -602,6 +611,7 @@
     }
 
     function generateYaml() {
+      if (isClaude()) return generateClaude();
       const prefix = getPrefix();
       const interval = Math.max(300, Number(state.interval) || 86400);
       const subUrl = (state.subUrl || 'https://example.com/sub').trim();
@@ -820,6 +830,7 @@ ${rules.join('\n')}
     }
 
     function generateJs() {
+      if (isClaude()) return generateClaude(true);
       const prefix = getPrefix();
       const interval = Math.max(300, Number(state.interval) || 86400);
 
@@ -895,7 +906,67 @@ ${ruleLines.join(',\n')}
 `;
     }
 
+    function isClaude() {
+      return state.claudeOnly && ['mihomo', 'js'].includes(state.mode);
+    }
+
+    function generateClaude(script = false) {
+      // 白名单只包含明确指定的国内平台域名，IP 请求和其他域名统一交给代理组。
+      const group = 'ClaudeProxy';
+      const domains = ['taobao.com', 'tmall.com', 'jd.com', '12306.cn'];
+      const rules = domains.map(domain => `DOMAIN-SUFFIX,${domain},DIRECT`).concat(`MATCH,${group}`);
+      // 普通 DNS 查询走代理，节点服务器域名可独立解析，避免代理尚未建立时形成循环。
+      const dns = {
+        enable: true, ipv6: false, 'enhanced-mode': 'fake-ip', 'fake-ip-range': '198.18.0.1/16',
+        nameserver: [`https://1.1.1.1/dns-query#${group}`],
+        'proxy-server-nameserver': ['223.5.5.5'],
+        'direct-nameserver': ['223.5.5.5'],
+      };
+
+      if (script) return `function main(config) {
+  // 只使用订阅里的代理节点，节点不足时使用 REJECT，避免回落到直连。
+  const nodes = (config.proxies || []).filter(node =>
+    node.server && !/^(direct|reject(?:-drop)?|pass|dns|compatible|rematch)$/i.test(node.type) &&
+    !/${EXCLUDE_REGEX}/i.test(node.name) &&
+    !/^(DIRECT|REJECT|REJECT-DROP|PASS|COMPATIBLE|GLOBAL|${group})$/i.test(node.name));
+  config.mode = 'rule';
+  config.dns = ${JSON.stringify(dns, null, 2)};
+  config['proxy-groups'] = [{ name: '${group}', type: 'select', proxies: [...nodes.map(node => node.name), 'REJECT'] }];
+  config.rules = ${JSON.stringify(rules, null, 2)};
+  return config;
+}
+`;
+
+      // 引入订阅源供服务端展开节点。REJECT 作为空组保护，转换成功后排在实际节点之后。
+      return `mixed-port: 7890
+allow-lan: false
+mode: rule
+ipv6: false
+dns: ${JSON.stringify(dns)}
+proxy-providers:
+  AirportSub:
+    type: http
+    url: ${JSON.stringify(state.subUrl.trim() || 'https://example.com/sub')}
+    path: ./proxies/claude.yaml
+    interval: 3600
+proxy-groups:
+  - name: ${group}
+    type: select
+    proxies: [REJECT]
+    use: [AirportSub]
+    filter: ${JSON.stringify(`(?i)^(?!.*(${EXCLUDE_REGEX})).*$`)}
+rules:
+${rules.map(rule => '  - ' + rule).join('\n')}
+`;
+    }
+
     function updatePreview() {
+      const claude = isClaude();
+      document.getElementById('claude-profile').classList.toggle('hidden', !['mihomo', 'js'].includes(state.mode));
+      document.getElementById('node-filter').classList.toggle('hidden', claude);
+      document.getElementById('sync-heading').parentElement.classList.toggle('hidden', claude);
+      document.getElementById('ai-heading').parentElement.parentElement.classList.toggle('hidden', claude);
+      document.getElementById('common-services-card').classList.toggle('hidden', claude);
       if (state.mode === 'js') {
         currentOutput = generateJs();
       } else if (state.mode === 'mihomo') {
@@ -926,7 +997,8 @@ ${ruleLines.join(',\n')}
         '\nx-ai-route-target: ' + JSON.stringify(state.mode) +
         '\nx-ai-route-ai: ' + JSON.stringify(state.ai) +
         '\nx-ai-route-services: ' + JSON.stringify(state.services) +
-        '\nx-ai-route-exclude-hk: ' + JSON.stringify(state.excludeHk) + '\n';
+        '\nx-ai-route-exclude-hk: ' + JSON.stringify(state.excludeHk) +
+        '\nx-ai-route-claude: ' + JSON.stringify(isClaude()) + '\n';
     }
 
     async function exportText() {
@@ -1044,6 +1116,12 @@ ${ruleLines.join(',\n')}
     // =========================================================================
     document.getElementById('sub-url').addEventListener('input', e => {
       state.subUrl = e.target.value;
+      updatePreview();
+    });
+
+    document.getElementById('claude-only').addEventListener('change', event => {
+      state.claudeOnly = event.target.checked;
+      document.getElementById('link-panel').classList.add('hidden');
       updatePreview();
     });
 
