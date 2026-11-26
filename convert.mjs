@@ -14,8 +14,17 @@ export async function convert(text, send = fetch) {
       /[\s|]/.test(source)) throw Error('请输入有效的 HTTPS 订阅或节点分享链接。');
   const api = new URL(endpoint);
   api.search = new URLSearchParams({ target: 'clash', list: 'true', url: source }).toString();
-  const response = await send(api, { redirect: 'error', signal: AbortSignal.timeout(20000),
-    headers: { 'User-Agent': 'AI-Route-Subconvert/1.0' } });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  let response;
+  try {
+    response = await send(api.href, { redirect: 'error', signal: controller.signal,
+      headers: { 'User-Agent': 'AI-Route-Subconvert/1.0' } });
+  } catch {
+    throw Error('公共后端连接失败或超时。');
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) throw Error('公共后端未能解析订阅，请检查上游地址或稍后重试。');
   const reader = response.body.getReader();
   let size = 0;
@@ -30,7 +39,12 @@ export async function convert(text, send = fetch) {
     }
     chunks.push(value);
   }
-  const parsed = parse(await new Blob(chunks).text(), { maxAliasCount: 0 });
+  let parsed;
+  try {
+    parsed = parse(await new Response(new Blob(chunks)).text(), { maxAliasCount: 0 });
+  } catch {
+    throw Error('公共后端返回了无法解析的 YAML。');
+  }
   const nodes = parsed?.proxies;
   if (!Array.isArray(nodes) || !nodes.length || nodes.length > 5000) throw Error('未取得有效节点列表。');
   const groups = config['proxy-groups'];
@@ -57,4 +71,3 @@ export async function convert(text, send = fetch) {
   config.proxies = nodes;
   return stringify(config, { lineWidth: 0 });
 }
-
