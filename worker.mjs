@@ -13,6 +13,7 @@ async function render(text, origin) {
 
 const maxYaml = 24 * 1024;
 const maxToken = 6000;
+const dailyLimit = 5;
 const shortId = /^[0-9a-f]{48}$/;
 const privateHeaders = {
   'Cache-Control': 'no-store',
@@ -47,6 +48,47 @@ async function importKey(secret) {
 
 function fail(body, status, headers = {}) {
   return new Response(body, { status, headers: { ...privateHeaders, ...headers } });
+}
+
+function limitedPath(path) {
+  return path === '/api/config' ||
+    ['/api/inline', '/api/convert', '/api/subscriptions'].includes(path) ||
+    path.startsWith('/sub/v1/') || path.startsWith('/sub/v2/') || path.startsWith('/sub/v3/');
+}
+
+// 按上海时区自然日限制每个客户端 IP。KV 计数在并发突发下可能有短暂延迟。
+async function limitRequest(request, env) {
+  const ip = request.headers.get('CF-Connecting-IP');
+  if (!ip) return null;
+  if (!env.SUBSCRIPTIONS) return fail('Rate limit storage is unavailable.', 503);
+
+  const utc = new Date();
+  const local = new Date(utc.getTime() + 8 * 60 * 60 * 1000);
+  const day = local.toISOString().slice(0, 10);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip));
+  const hash = Array.from(new Uint8Array(digest).slice(0, 16), byte => byte.toString(16).padStart(2, '0')).join('');
+  const key = `rate:v1:${day}:${hash}`;
+
+  let count;
+  try {
+    count = Number(await env.SUBSCRIPTIONS.get(key)) || 0;
+  } catch {
+    return fail('Rate limit storage is unavailable.', 503);
+  }
+  if (count >= dailyLimit) {
+    const reset = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1) - 8 * 60 * 60 * 1000;
+    return fail('Daily request limit reached. Try again after 00:00 Asia/Shanghai.', 429, {
+      'Retry-After': String(Math.max(60, Math.ceil((reset - utc.getTime()) / 1000))),
+      'X-RateLimit-Limit': String(dailyLimit),
+      'X-RateLimit-Remaining': '0',
+    });
+  }
+  try {
+    await env.SUBSCRIPTIONS.put(key, String(count + 1), { expirationTtl: 26 * 60 * 60 });
+  } catch {
+    return fail('Rate limit storage is unavailable.', 503);
+  }
+  return null;
 }
 
 // 先压缩，再用 AES-GCM 加密。每条链接使用独立随机数，避免同一配置产生相同地址。
@@ -198,8 +240,12 @@ async function config(request, env) {
   });
 }
 export default {
-  fetch(request, env) {
+  async fetch(request, env) {
     const path = new URL(request.url).pathname;
+    if (limitedPath(path)) {
+      const limited = await limitRequest(request, env);
+      if (limited) return limited;
+    }
     if (['/api/inline','/api/convert','/api/subscriptions'].includes(path)) return createSub(request, env);
     if (path.startsWith('/sub/v1/') || path.startsWith('/sub/v2/') || path.startsWith('/sub/v3/')) return getSub(request, env);
     if (path === '/api/rules.ini') return rules(request);

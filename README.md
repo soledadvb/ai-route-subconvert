@@ -84,6 +84,17 @@
 
 公共后端会接收完整的节点订阅地址。短链接持有者也能读取生成的配置，请按私有凭据保管订阅和生成链接。
 
+### 访问频率限制
+
+同一客户端 IP 按 Asia/Shanghai 自然日最多获取 5 次配置。限制覆盖 `/api/convert`、`/api/inline`、`/api/subscriptions`、`/sub/v1/*`、`/sub/v2/*`、`/sub/v3/*` 和 `/api/config`。
+
+- 生成短链接并首次读取会分别计入一次。
+- `/api/rules.ini` 由转换后端内部调用，不占用用户次数。
+- 计数器保存在 `SUBSCRIPTIONS` KV 中，只保存 IP 哈希和计数，不保存原始 IP。
+- 使用同一公网 IP 的设备共享这 5 次额度。
+- 达到限制后返回 HTTP `429` 和 `Retry-After` 响应头。
+- KV 计数在极高并发的瞬间可能存在短暂延迟。
+
 ## 规则来源
 
 - [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat)
