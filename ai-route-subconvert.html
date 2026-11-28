@@ -98,7 +98,7 @@
 
         <div id="sub-url-group" class="space-y-1.5">
           <label for="sub-url" class="block text-xs font-medium text-zinc-300">
-            节点订阅链接 <span class="text-zinc-500 font-normal">支持 HTTPS 订阅和节点分享链接。</span>
+            节点订阅链接 <span class="text-zinc-500 font-normal">支持 HTTP/HTTPS 订阅和节点分享链接，HTTP 不加密。</span>
           </label>
           <input
             id="sub-url"
@@ -1103,9 +1103,9 @@ ${rules.map(rule => '  - ' + rule).join('\n')}
       copy.disabled = true;
       try {
         const upstream = new URL(state.subUrl.trim());
-        if (!['https:', 'ss:', 'vmess:', 'trojan:'].includes(upstream.protocol) || upstream.hostname === 'example.com') throw new Error();
+        if (!['https:', 'http:', 'ss:', 'vmess:', 'trojan:'].includes(upstream.protocol) || upstream.hostname === 'example.com') throw new Error();
       } catch {
-        status.textContent = '请先填写自己的 HTTPS 节点订阅链接。';
+        status.textContent = '请先填写自己的 HTTP/HTTPS 节点订阅链接。';
         return;
       }
       button.disabled = true;

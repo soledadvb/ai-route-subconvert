@@ -368,8 +368,9 @@ export async function convert(text, send = (url, init) => fetch(url, init), orig
   if (typeof source !== 'string' || !Array.isArray(config['proxy-groups']) ||
       !Array.isArray(config.rules)) throw Error('分流模板无效。');
   const upstream = new URL(source);
-  if (!['https:', 'ss:', 'vmess:', 'trojan:'].includes(upstream.protocol) ||
-      /[\s|]/.test(source)) throw Error('请输入有效的 HTTPS 订阅或节点分享链接。');
+  // 自建订阅常用明文 HTTP，放行 http 避免把可用地址误判为无效。
+  if (!['https:', 'http:', 'ss:', 'vmess:', 'trojan:'].includes(upstream.protocol) ||
+      /[\s|]/.test(source)) throw Error('请输入有效的 HTTP/HTTPS 订阅或节点分享链接。');
   const backend = config['x-ai-route-backend'] || backends[0];
   if (!backends.includes(backend)) throw Error('分流模板中的后端无效。');
   const client = clients[config['x-ai-route-target']] ? config['x-ai-route-target'] : 'mihomo';
